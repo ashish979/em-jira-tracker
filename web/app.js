@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-sprint-epics-v1";
+const CACHE_VERSION = "2026-07-06-support-actions-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -463,31 +463,31 @@ function renderBoards(cache) {
 function renderSupport(cache) {
   setMeta("support", cache);
   const payload = { ...cache.payload, tickets: (cache.payload.tickets || []).filter(isNotDone) };
+  const filterUrl = payload.url || supportFilterUrl(payload.filterId || "18377");
   document.getElementById("support-view").innerHTML = `
     <div class="support-header">
       <div>
         <span class="eyebrow">filter ${escapeHtml(payload.filterId || "18377")}</span>
         <h4>Customer support attention queue</h4>
       </div>
-      <a class="command-link" href="${escapeAttribute(payload.url || "https://josysglobal.atlassian.net/issues/?filter=18377")}" target="_blank" rel="noopener noreferrer">Open in Jira</a>
+      <a class="command-link" href="${escapeAttribute(filterUrl)}" target="_blank" rel="noopener noreferrer">Open in Jira</a>
     </div>
     <div class="metric-grid compact">
-      ${renderMetric("Tickets", payload.tickets.length, "open in filter")}
-      ${renderMetric("Critical", payload.tickets.filter((ticket) => ticket.severity === "critical").length, "needs attention")}
-      ${renderMetric("Stale", payload.tickets.filter((ticket) => ticket.reasons?.some((reason) => reason.includes("motion"))).length, "age signal")}
-      ${renderMetric("Unassigned", payload.tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap")}
+      ${renderMetric("Tickets", payload.tickets.length, "open in filter", supportSearchUrl(payload))}
+      ${renderMetric("Critical", payload.tickets.filter((ticket) => ticket.severity === "critical").length, "needs attention", supportSearchUrl(payload, "AND (labels = blocked OR duedate <= now()) ORDER BY priority DESC, updated ASC"))}
+      ${renderMetric("Stale", payload.tickets.filter((ticket) => ticket.reasons?.some((reason) => reason.includes("motion"))).length, "age signal", supportSearchUrl(payload, "AND updated <= -7d ORDER BY updated ASC"))}
+      ${renderMetric("Unassigned", payload.tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap", supportSearchUrl(payload, "AND assignee is EMPTY ORDER BY priority DESC, updated ASC"))}
     </div>
     <div class="ops-grid">
-      ${renderGroupPanel("Status", payload.groups?.byStatus || [])}
-      ${renderGroupPanel("Assignee", payload.groups?.byAssignee || [])}
-      ${renderGroupPanel("Priority", payload.groups?.byPriority || [])}
+      ${renderGroupPanel("Status", payload.groups?.byStatus || [], "", (item) => supportSearchUrl(payload, `AND status = ${jqlQuote(item.name)} ORDER BY priority DESC, updated ASC`))}
+      ${renderGroupPanel("Assignee", payload.groups?.byAssignee || [], "", (item) => supportAssigneeSearchUrl(payload, item.name))}
+      ${renderGroupPanel("Priority", payload.groups?.byPriority || [], "", (item) => supportPrioritySearchUrl(payload, item.name))}
     </div>
-    <div class="panel">
-      <div class="panel-heading"><h4>Support tickets</h4><span>${payload.tickets?.length || 0} issues</span></div>
-      <div id="support-issues"></div>
+    <div class="panel support-ticket-panel">
+      <div class="panel-heading"><h4>Support tickets</h4>${renderCountLink(payload.tickets?.length || 0, supportSearchUrl(payload), "issues")}</div>
+      <div class="compact-ticket-list">${payload.tickets.length ? payload.tickets.map(renderSupportCompactIssue).join("") : `<span class="empty-state">No support tickets found</span>`}</div>
     </div>
   `;
-  renderPaginatedList("support-issues", payload.tickets || [], renderIssue);
 }
 
 function renderTrackers(cache) {
@@ -571,6 +571,17 @@ function renderCompactIssue(item) {
       <strong>${escapeHtml(item.summary || "Untitled issue")}</strong>
       <em>${escapeHtml(item.assignee || "Unassigned")}</em>
       <small>${escapeHtml(item.status || "Unknown")}</small>
+    </a>
+  `;
+}
+
+function renderSupportCompactIssue(item) {
+  return `
+    <a class="compact-ticket support-compact-ticket" href="${escapeAttribute(issueHref(item))}" target="_blank" rel="noopener noreferrer">
+      <span>${escapeHtml(item.key)}</span>
+      <strong>${escapeHtml(item.summary || "Untitled issue")}</strong>
+      <em>${escapeHtml(item.assignee || "Unassigned")}</em>
+      <small>${escapeHtml(item.priority || "None")} · ${escapeHtml(item.status || "Unknown")}</small>
     </a>
   `;
 }
@@ -692,7 +703,6 @@ function rerenderPaginatedList(containerId) {
   if (containerId === "my-issues") return renderOverview(loadCache("overview"));
   if (containerId === "em-issues") return renderOverview(loadCache("overview"));
   if (containerId === "attention-list") return renderAttention(loadCache("attention"));
-  if (containerId === "support-issues") return renderSupport(loadCache("support"));
   if (containerId.startsWith("sprint-tickets-")) return renderSprint(loadCache("sprint"));
 }
 
@@ -831,6 +841,29 @@ function sprintEpicSearchUrl(board, epicKey) {
   return sprintSearchUrl(board, `${epicJqlClause(epicKey)} ORDER BY updated DESC`);
 }
 
+function supportFilterUrl(filterId = "18377") {
+  return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?filter=${encodeURIComponent(filterId)}`;
+}
+
+function supportSearchUrl(payload, suffix = "ORDER BY priority DESC, updated ASC") {
+  const filterId = payload.filterId || "18377";
+  return jiraSearchUrl(`filter = ${filterId} ${suffix}`.trim());
+}
+
+function supportAssigneeSearchUrl(payload, assignee) {
+  const clause = assignee === "Unassigned"
+    ? "AND assignee is EMPTY"
+    : `AND assignee = ${jqlQuote(assignee)}`;
+  return supportSearchUrl(payload, `${clause} ORDER BY priority DESC, updated ASC`);
+}
+
+function supportPrioritySearchUrl(payload, priority) {
+  const clause = priority === "None"
+    ? "AND priority is EMPTY"
+    : `AND priority = ${jqlQuote(priority)}`;
+  return supportSearchUrl(payload, `${clause} ORDER BY priority DESC, updated ASC`);
+}
+
 function epicJqlClause(epicKey) {
   if (epicKey === "NO_EPIC") return `AND parent is EMPTY AND "Epic Link" is EMPTY`;
   return `AND (parent = ${jqlQuote(epicKey)} OR "Epic Link" = ${jqlQuote(epicKey)})`;
@@ -935,6 +968,12 @@ document.getElementById("refresh-all").addEventListener("click", async () => {
 document.getElementById("clear-cache").addEventListener("click", () => {
   for (const section of sections) localStorage.removeItem(`${CACHE_PREFIX}cache:${section}`);
   renderAll();
+});
+
+document.getElementById("sidebar-toggle").addEventListener("click", () => {
+  const shell = document.querySelector(".app-shell");
+  const collapsed = shell.classList.toggle("nav-collapsed");
+  document.getElementById("sidebar-toggle").setAttribute("aria-expanded", String(!collapsed));
 });
 
 document.getElementById("save-settings").addEventListener("click", () => {

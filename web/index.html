@@ -16,14 +16,19 @@
             <h1>Jira Command Center</h1>
           </div>
         </div>
+        <div class="nav-actions">
+          <button class="icon-button" id="sidebar-toggle" title="Collapse navigation" aria-label="Collapse navigation" aria-expanded="true">M</button>
+          <button class="icon-button" id="refresh-all" title="Refresh all sections" aria-label="Refresh all sections">R</button>
+          <button class="icon-button" id="clear-cache" title="Clear local cache" aria-label="Clear local cache">C</button>
+        </div>
         <nav class="nav-list" id="nav-list">
-          <button data-page-target="team">Team</button>
-          <button data-page-target="sprint">Sprint</button>
-          <button data-page-target="overview">Overview</button>
-          <button data-page-target="attention">Attention</button>
-          <button data-page-target="support">Support</button>
-          <button data-page-target="trackers">Trackers</button>
-          <button data-page-target="settings">Settings</button>
+          <button data-page-target="team" data-short="T">Team</button>
+          <button data-page-target="sprint" data-short="Sp">Sprint</button>
+          <button data-page-target="overview" data-short="O">Overview</button>
+          <button data-page-target="attention" data-short="A">Attention</button>
+          <button data-page-target="support" data-short="Su">Support</button>
+          <button data-page-target="trackers" data-short="Tr">Trackers</button>
+          <button data-page-target="settings" data-short="Se">Settings</button>
         </nav>
         <div class="terminal-note">
           <span>cache:</span>
@@ -32,17 +37,6 @@
       </aside>
 
       <main class="main-panel">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">manual refresh only</p>
-            <h2>EM control surface</h2>
-          </div>
-          <div class="topbar-actions">
-            <button class="icon-button" id="refresh-all" title="Refresh all sections" aria-label="Refresh all sections">R</button>
-            <button class="icon-button" id="clear-cache" title="Clear local cache" aria-label="Clear local cache">C</button>
-          </div>
-        </header>
-
         <section id="team" class="section-band page-section" data-page="team">
           <div class="section-heading">
             <div>

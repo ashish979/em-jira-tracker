@@ -44,6 +44,11 @@ button {
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
   min-width: 0;
+  transition: grid-template-columns 160ms ease;
+}
+
+.app-shell.nav-collapsed {
+  grid-template-columns: 82px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -57,6 +62,7 @@ button {
   flex-direction: column;
   gap: 26px;
   min-width: 0;
+  transition: padding 160ms ease;
 }
 
 .brand {
@@ -89,6 +95,11 @@ button {
 
 .brand h1 {
   font-size: 18px;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .eyebrow {
@@ -127,6 +138,10 @@ a.eyebrow:hover {
   text-align: left;
 }
 
+.nav-list button::before {
+  content: "";
+}
+
 .nav-list button:hover,
 .nav-list button.active {
   color: var(--text);
@@ -154,10 +169,55 @@ a.eyebrow:hover {
   font-weight: 700;
 }
 
+.nav-collapsed .sidebar {
+  align-items: center;
+  padding: 18px 12px;
+}
+
+.nav-collapsed .brand {
+  justify-content: center;
+}
+
+.nav-collapsed .brand > div,
+.nav-collapsed .terminal-note span {
+  display: none;
+}
+
+.nav-collapsed .nav-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-collapsed .nav-list {
+  width: 100%;
+}
+
+.nav-collapsed .nav-list button {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 10px 0;
+  font-size: 0;
+  text-align: center;
+}
+
+.nav-collapsed .nav-list button::before {
+  content: attr(data-short);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nav-collapsed .terminal-note {
+  width: 100%;
+  padding: 10px 6px;
+  text-align: center;
+}
+
 .main-panel {
   padding: 24px;
   display: grid;
   gap: 18px;
+  align-content: start;
   min-width: 0;
 }
 
@@ -233,7 +293,7 @@ a.eyebrow:hover {
 }
 
 .page-section {
-  min-height: calc(100vh - 124px);
+  min-height: calc(100vh - 48px);
 }
 
 .section-heading h3 {
