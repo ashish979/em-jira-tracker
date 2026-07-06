@@ -83,9 +83,19 @@ async function refreshPayload(section, body, config) {
     return Promise.all(members.map((member) => loadMemberSummary(jira, member, fields, emField, boards, siteUrl)));
   }
 
+  if (section === "sprint") {
+    const members = parseLines(body?.settings?.teamMembers || "");
+    const boards = parseTracked(body?.settings?.trackedItems || "", "board");
+    return Promise.all(boards.map((board) => loadSprintSummary(jira, board, fields, emField, members, siteUrl)));
+  }
+
   if (section === "boards") {
     const boards = parseTracked(body?.settings?.trackedItems || "", "board");
     return Promise.all(boards.map((board) => loadBoardSummary(jira, board, fields, emField, siteUrl)));
+  }
+
+  if (section === "support") {
+    return loadSupportAttention(jira, fields, emField, siteUrl, "18377");
   }
 
   if (section === "trackers") {
@@ -165,6 +175,88 @@ async function loadBoardSummary(jira, board, fields, emField, siteUrl) {
   };
 }
 
+async function loadSprintSummary(jira, board, fields, emField, members, siteUrl) {
+  const [boardDetails, sprints, backlog] = await Promise.all([
+    jira.getBoard(board.id),
+    jira.getActiveSprints(board.id),
+    jira.getBacklog(board.id, { fields, limit: 1000 }),
+  ]);
+  const sprint = sprints.values?.[0] || null;
+  const sprintIssues = sprint
+    ? await jira.getSprintIssues(sprint.id, { fields, limit: 1000 })
+    : { issues: [] };
+  const tickets = (sprintIssues.issues || []).map((issue) => normalizeIssue(issue, emField, siteUrl));
+  const assigneeCounts = groupCount(tickets, (ticket) => ticket.assignee || "Unassigned");
+  const memberCoverage = members.map((member) => {
+    const display = memberDisplay(member);
+    const count = tickets.filter((ticket) => sameAssignee(ticket.assignee, member, display)).length;
+    return { member, display, count, hasTicket: count > 0 };
+  });
+
+  return {
+    id: board.id,
+    name: board.name || boardDetails.name,
+    sprint: sprint
+      ? {
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state,
+          startDate: sprint.startDate || null,
+          endDate: sprint.endDate || null,
+          completeDate: sprint.completeDate || null,
+          goal: sprint.goal || "",
+          daysRemaining: daysUntil(sprint.endDate),
+          isPastEndDate: sprint.endDate ? daysUntil(sprint.endDate) < 0 : false,
+        }
+      : null,
+    totals: {
+      tickets: tickets.length,
+      done: tickets.filter((ticket) => ticket.statusCategory === "done" || ticket.status.toLowerCase() === "done").length,
+      inProgress: tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+      unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+      backlog: backlog.issues?.length || 0,
+    },
+    groups: {
+      byStatus: groupCount(tickets, (ticket) => ticket.status || "Unknown"),
+      byAssignee: assigneeCounts,
+      byPriority: groupCount(tickets, (ticket) => ticket.priority || "None"),
+      byType: groupCount(tickets, (ticket) => ticket.type || "Issue"),
+    },
+    coverage: {
+      withTickets: memberCoverage.filter((member) => member.hasTicket),
+      withoutTickets: memberCoverage.filter((member) => !member.hasTicket),
+      unassignedTickets: tickets.filter((ticket) => ticket.assignee === "Unassigned").slice(0, 20),
+    },
+    tickets,
+  };
+}
+
+async function loadSupportAttention(jira, fields, emField, siteUrl, filterId) {
+  const result = await jira.searchIssues({
+    jql: `filter = ${filterId} ORDER BY priority DESC, updated ASC`,
+    fields,
+    maxResults: 100,
+    limit: 1000,
+  });
+  const tickets = result.issues.map((issue) => normalizeIssue(issue, emField, siteUrl)).map(addAttentionReasons);
+  return {
+    filterId,
+    url: `${siteUrl.replace(/\/$/, "")}/issues/?filter=${filterId}`,
+    totals: {
+      tickets: tickets.length,
+      critical: tickets.filter((ticket) => ticket.severity === "critical").length,
+      stale: tickets.filter((ticket) => ticket.reasons.some((reason) => reason.includes("motion"))).length,
+      unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+    },
+    groups: {
+      byStatus: groupCount(tickets, (ticket) => ticket.status || "Unknown"),
+      byAssignee: groupCount(tickets, (ticket) => ticket.assignee || "Unassigned"),
+      byPriority: groupCount(tickets, (ticket) => ticket.priority || "None"),
+    },
+    tickets,
+  };
+}
+
 async function loadFilterSummary(jira, filter, fields) {
   const result = await jira.searchIssues({
     jql: `filter = ${filter.id}`,
@@ -204,6 +296,30 @@ function parseTracked(value, type) {
     });
 }
 
+function groupCount(items, keyFn) {
+  const counts = new Map();
+  for (const item of items) {
+    const key = keyFn(item) || "Unknown";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function memberDisplay(member) {
+  return member.split("@")[0].replace(/[._-]+/g, " ");
+}
+
+function sameAssignee(assignee, member, display) {
+  const normalizedAssignee = normalizePerson(assignee);
+  return normalizedAssignee === normalizePerson(member) || normalizedAssignee.includes(normalizePerson(display));
+}
+
+function normalizePerson(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 function addAttentionReasons(item) {
   const dueIn = item.due ? daysUntil(item.due) : null;
   const staleAge = item.ageDays ?? ageDays(item.statusCategoryChangedDate || item.updated);
@@ -221,6 +337,7 @@ function addAttentionReasons(item) {
 }
 
 function daysUntil(isoDate) {
+  if (!isoDate) return null;
   return Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86400000);
 }
 

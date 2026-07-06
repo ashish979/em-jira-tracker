@@ -1,6 +1,8 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-team-links-v2";
-const sections = ["overview", "attention", "team", "boards", "trackers"];
+const CACHE_VERSION = "2026-07-06-pages-sprint-support-v1";
+const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
+const pageSize = 12;
+const paginationState = {};
 
 const defaultSettings = {
   settingsVersion: CACHE_VERSION,
@@ -25,7 +27,7 @@ const defaultSettings = {
     "swathi.kolamala@josys.com",
     "vikas.sahu@josys.com",
   ].join("\n"),
-  trackedItems: ["board:141 User Profiles/Identities"].join("\n"),
+  trackedItems: ["board:141 User Profiles/Identities", "filter:18377 Customer support attention"].join("\n"),
 };
 
 const seed = {
@@ -113,7 +115,8 @@ function buildMockPayload(section, settings) {
   if (section === "overview") return buildOverview();
   if (section === "attention") return buildAttention();
   if (section === "team") return buildTeam(members);
-  if (section === "boards") return buildBoards(tracked);
+  if (section === "sprint") return buildSprint(tracked, members);
+  if (section === "support") return buildSupport();
   if (section === "trackers") return buildTrackers(tracked);
   return {};
 }
@@ -187,6 +190,73 @@ function buildBoards(tracked) {
   return configuredBoards.length ? configuredBoards : seed.boards;
 }
 
+function buildSprint(tracked, members) {
+  return buildBoards(tracked).map((board) => {
+    const tickets = seed.issues.map((item, index) => ({ ...item, assignee: members[index % Math.max(1, members.length)] || item.assignee }));
+    return {
+      ...board,
+      sprint: {
+        id: 11306,
+        name: "SC-Sprint 8",
+        state: "active",
+        startDate: new Date(Date.now() - 7 * 86400000).toISOString(),
+        endDate: new Date(Date.now() + 5 * 86400000).toISOString(),
+        goal: "Keep identity/profile work moving without hidden blockers",
+        daysRemaining: 5,
+        isPastEndDate: false,
+      },
+      totals: {
+        tickets: tickets.length,
+        done: tickets.filter((ticket) => ticket.status === "Done").length,
+        inProgress: tickets.filter((ticket) => ticket.status.includes("Progress")).length,
+        unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+        backlog: board.backlog,
+      },
+      groups: {
+        byStatus: groupCount(tickets, (ticket) => ticket.status),
+        byAssignee: groupCount(tickets, (ticket) => ticket.assignee),
+        byPriority: groupCount(tickets, (ticket) => ticket.priority),
+        byType: groupCount(tickets, () => "Task"),
+      },
+      coverage: {
+        withTickets: members.slice(0, 4).map((member) => ({ member, display: member, count: 1, hasTicket: true })),
+        withoutTickets: members.slice(4, 8).map((member) => ({ member, display: member, count: 0, hasTicket: false })),
+        unassignedTickets: [],
+      },
+      tickets,
+    };
+  });
+}
+
+function buildSupport() {
+  const tickets = seed.issues.map(addMockReasons);
+  return {
+    filterId: "18377",
+    url: "https://josysglobal.atlassian.net/issues/?filter=18377",
+    totals: {
+      tickets: tickets.length,
+      critical: tickets.filter((ticket) => ticket.severity === "critical").length,
+      stale: tickets.filter((ticket) => ticket.reasons.some((reason) => reason.includes("motion"))).length,
+      unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+    },
+    groups: {
+      byStatus: groupCount(tickets, (ticket) => ticket.status),
+      byAssignee: groupCount(tickets, (ticket) => ticket.assignee),
+      byPriority: groupCount(tickets, (ticket) => ticket.priority),
+    },
+    tickets,
+  };
+}
+
+function addMockReasons(item) {
+  const dueIn = daysUntil(item.due);
+  const reasons = [];
+  if (dueIn < 0) reasons.push(`${Math.abs(dueIn)}d overdue`);
+  if (item.ageDays > 7) reasons.push(`${item.ageDays}d in motion`);
+  if (item.labels.includes("blocked")) reasons.push("blocked");
+  return { ...item, reasons, severity: reasons.includes("blocked") || dueIn < 0 ? "critical" : reasons.length ? "warn" : "good" };
+}
+
 function buildTrackers(tracked) {
   const configured = tracked
     .filter((line) => line.startsWith("filter:") || line.startsWith("dashboard:"))
@@ -202,12 +272,14 @@ function renderAll() {
   for (const section of sections) {
     if (!loadCache(section)) saveCache(section, buildMockPayload(section, loadSettings()), "seed");
   }
+  renderTeam(loadCache("team"));
+  renderSprint(loadCache("sprint"));
   renderOverview(loadCache("overview"));
   renderAttention(loadCache("attention"));
-  renderTeam(loadCache("team"));
-  renderBoards(loadCache("boards"));
+  renderSupport(loadCache("support"));
   renderTrackers(loadCache("trackers"));
   hydrateSettings();
+  activatePage(location.hash?.replace("#", "") || "team");
   setGlobalCacheState("warm");
 }
 
@@ -219,13 +291,13 @@ function renderOverview(cache) {
   `).join("");
   document.getElementById("my-ticket-count").textContent = `${payload.myIssues.length} issues`;
   document.getElementById("em-ticket-count").textContent = `${payload.emIssues.length} issues`;
-  document.getElementById("my-issues").innerHTML = payload.myIssues.map(renderIssue).join("");
-  document.getElementById("em-issues").innerHTML = payload.emIssues.map(renderIssue).join("");
+  renderPaginatedList("my-issues", payload.myIssues, renderIssue);
+  renderPaginatedList("em-issues", payload.emIssues, renderIssue);
 }
 
 function renderAttention(cache) {
   setMeta("attention", cache);
-  document.getElementById("attention-list").innerHTML = cache.payload.map((item) => `
+  renderPaginatedList("attention-list", cache.payload, (item) => `
     <article class="attention-row ${item.severity === "critical" ? "critical" : ""}">
       <div class="attention-top">
         <div>
@@ -236,12 +308,114 @@ function renderAttention(cache) {
       </div>
       <div class="tag-row">${item.reasons.map((reason) => `<span class="tag warn">${escapeHtml(reason)}</span>`).join("")}</div>
     </article>
-  `).join("");
+  `);
 }
 
 function renderTeam(cache) {
   setMeta("team", cache);
+  renderTeamCommand(cache.payload);
   document.getElementById("team-list").innerHTML = cache.payload.map(renderTeamMember).join("");
+}
+
+function renderTeamCommand(members) {
+  const sorted = [...members].sort((a, b) => (b.active || 0) - (a.active || 0));
+  const noSprintTickets = members.filter((member) => !(member.boards || []).some((board) => board.active > 0 || board.workedOn > 0));
+  const stale = members.filter((member) => (member.oldest || 0) > 14);
+  document.getElementById("team-command").innerHTML = `
+    <div class="team-radar-card">
+      <h4>Workload shape</h4>
+      <div class="load-bars">
+        ${sorted.map((member) => {
+          const width = Math.min(100, Math.round(((member.active || 0) / Math.max(1, sorted[0]?.active || 1)) * 100));
+          return `
+            <div class="load-row">
+              <span>${escapeHtml(shortName(member.member))}</span>
+              <div class="load-track"><div style="width: ${width}%"></div></div>
+              <strong>${member.active || 0}</strong>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+    <div class="team-radar-card">
+      <h4>EM signals</h4>
+      <div class="signal-grid">
+        ${renderSignal("No sprint activity", noSprintTickets.length, noSprintTickets.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear")}
+        ${renderSignal("Stale oldest item", stale.length, stale.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear")}
+        ${renderSignal("Total active", members.reduce((sum, member) => sum + (member.active || 0), 0), "assigned across team")}
+        ${renderSignal("In progress", members.reduce((sum, member) => sum + (member.inProgress || 0), 0), "currently moving")}
+      </div>
+    </div>
+  `;
+}
+
+function renderSignal(label, value, detail) {
+  return `<div class="signal"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small></div>`;
+}
+
+function renderSprint(cache) {
+  setMeta("sprint", cache);
+  document.getElementById("sprint-view").innerHTML = cache.payload.map(renderSprintBoard).join("");
+  for (const board of cache.payload) {
+    renderPaginatedList(`sprint-tickets-${board.id}`, board.tickets || [], renderIssue);
+  }
+}
+
+function renderSprintBoard(board) {
+  const sprint = board.sprint;
+  if (!sprint) {
+    return `<article class="panel"><h4>${escapeHtml(board.name)}</h4><p class="empty-state">No active sprint found.</p></article>`;
+  }
+  const progress = Math.round(((board.totals?.done || 0) / Math.max(1, board.totals?.tickets || 0)) * 100);
+  const endCopy = sprint.daysRemaining === null
+    ? "No end date"
+    : sprint.daysRemaining < 0
+      ? `${Math.abs(sprint.daysRemaining)}d past end`
+      : sprint.daysRemaining === 0
+        ? "Ends today"
+        : `${sprint.daysRemaining}d left`;
+  const statusGroupId = `sprint-status-${board.id}`;
+  const assigneeGroupId = `sprint-assignee-${board.id}`;
+  const priorityGroupId = `sprint-priority-${board.id}`;
+  const ticketListId = `sprint-tickets-${board.id}`;
+  return `
+    <article class="sprint-board">
+      <div class="sprint-hero">
+        <div>
+          <span class="eyebrow">board ${escapeHtml(board.id)}</span>
+          <h4>${escapeHtml(sprint.name)}</h4>
+          <p>${escapeHtml(board.name)}${sprint.goal ? ` · ${escapeHtml(sprint.goal)}` : ""}</p>
+        </div>
+        <span class="sprint-date ${sprint.isPastEndDate ? "danger" : ""}">${escapeHtml(endCopy)}</span>
+      </div>
+      <div class="metric-grid compact">
+        ${renderMetric("Sprint tickets", board.totals?.tickets || 0, `${progress}% done`)}
+        ${renderMetric("In progress", board.totals?.inProgress || 0, "active motion")}
+        ${renderMetric("Unassigned", board.totals?.unassigned || 0, "ownership gap")}
+        ${renderMetric("Backlog", board.totals?.backlog || 0, "outside sprint")}
+      </div>
+      <div class="progress-bar large"><div class="progress-fill" style="width: ${Math.min(100, progress)}%"></div></div>
+      <div class="ops-grid">
+        ${renderGroupPanel("By status", board.groups?.byStatus || [], statusGroupId)}
+        ${renderGroupPanel("By assignee", board.groups?.byAssignee || [], assigneeGroupId)}
+        ${renderGroupPanel("By priority", board.groups?.byPriority || [], priorityGroupId)}
+      </div>
+      <div class="coverage-grid">
+        <div class="panel">
+          <div class="panel-heading"><h4>Has sprint tickets</h4><span>${board.coverage?.withTickets?.length || 0}</span></div>
+          <div class="person-chip-list">${(board.coverage?.withTickets || []).map((person) => `<span class="person-chip">${escapeHtml(shortName(person.member))}<strong>${person.count}</strong></span>`).join("") || `<span class="empty-state">No one mapped yet</span>`}</div>
+        </div>
+        <div class="panel">
+          <div class="panel-heading"><h4>No sprint tickets</h4><span>${board.coverage?.withoutTickets?.length || 0}</span></div>
+          <div class="person-chip-list">${(board.coverage?.withoutTickets || []).map((person) => `<span class="person-chip muted">${escapeHtml(shortName(person.member))}</span>`).join("") || `<span class="empty-state">Everyone has sprint work</span>`}</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-heading"><h4>Sprint tickets</h4><span>${board.tickets?.length || 0} issues</span></div>
+        <div id="${ticketListId}"></div>
+      </div>
+    </article>
+  `;
 }
 
 function renderBoards(cache) {
@@ -269,6 +443,36 @@ function renderBoards(cache) {
   }).join("");
 }
 
+function renderSupport(cache) {
+  setMeta("support", cache);
+  const payload = cache.payload;
+  document.getElementById("support-view").innerHTML = `
+    <div class="support-header">
+      <div>
+        <span class="eyebrow">filter ${escapeHtml(payload.filterId || "18377")}</span>
+        <h4>Customer support attention queue</h4>
+      </div>
+      <a class="command-link" href="${escapeAttribute(payload.url || "https://josysglobal.atlassian.net/issues/?filter=18377")}" target="_blank" rel="noopener noreferrer">Open in Jira</a>
+    </div>
+    <div class="metric-grid compact">
+      ${renderMetric("Tickets", payload.totals?.tickets || 0, "in filter")}
+      ${renderMetric("Critical", payload.totals?.critical || 0, "needs attention")}
+      ${renderMetric("Stale", payload.totals?.stale || 0, "age signal")}
+      ${renderMetric("Unassigned", payload.totals?.unassigned || 0, "ownership gap")}
+    </div>
+    <div class="ops-grid">
+      ${renderGroupPanel("Status", payload.groups?.byStatus || [])}
+      ${renderGroupPanel("Assignee", payload.groups?.byAssignee || [])}
+      ${renderGroupPanel("Priority", payload.groups?.byPriority || [])}
+    </div>
+    <div class="panel">
+      <div class="panel-heading"><h4>Support tickets</h4><span>${payload.tickets?.length || 0} issues</span></div>
+      <div id="support-issues"></div>
+    </div>
+  `;
+  renderPaginatedList("support-issues", payload.tickets || [], renderIssue);
+}
+
 function renderTrackers(cache) {
   setMeta("trackers", cache);
   document.getElementById("tracker-grid").innerHTML = cache.payload.map((tracker) => {
@@ -286,6 +490,30 @@ function renderTrackers(cache) {
       </article>
     `;
   }).join("");
+}
+
+function renderMetric(label, value, detail) {
+  return `<article class="metric"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small></article>`;
+}
+
+function renderGroupPanel(title, items, id = "") {
+  return `
+    <div class="group-panel"${id ? ` id="${escapeAttribute(id)}"` : ""}>
+      <h4>${escapeHtml(title)}</h4>
+      <div class="group-bars">
+        ${items.slice(0, 10).map((item) => {
+          const max = Math.max(1, items[0]?.count || 1);
+          return `
+            <div class="group-row">
+              <span>${escapeHtml(item.name)}</span>
+              <div class="load-track"><div style="width: ${Math.round((item.count / max) * 100)}%"></div></div>
+              <strong>${item.count}</strong>
+            </div>
+          `;
+        }).join("") || `<span class="empty-state">No data</span>`}
+      </div>
+    </div>
+  `;
 }
 
 function renderIssue(item) {
@@ -367,6 +595,51 @@ function setMeta(section, cache) {
   document.getElementById(`${section}-meta`).textContent = `${cache.source} cache refreshed ${ageMinutes}m ago`;
 }
 
+function renderPaginatedList(containerId, items, renderer, size = pageSize) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const totalPages = Math.max(1, Math.ceil(items.length / size));
+  const state = paginationState[containerId] || { page: 1 };
+  state.page = Math.min(Math.max(1, state.page), totalPages);
+  paginationState[containerId] = state;
+  const start = (state.page - 1) * size;
+  const pageItems = items.slice(start, start + size);
+
+  container.innerHTML = `
+    <div class="paginated-list">
+      ${pageItems.map(renderer).join("") || `<span class="empty-state">No issues found</span>`}
+    </div>
+    ${items.length > size ? `
+      <div class="pagination">
+        <button data-page-list="${escapeAttribute(containerId)}" data-page-delta="-1" ${state.page === 1 ? "disabled" : ""}>Prev</button>
+        <span>${state.page} / ${totalPages} · ${items.length} items</span>
+        <button data-page-list="${escapeAttribute(containerId)}" data-page-delta="1" ${state.page === totalPages ? "disabled" : ""}>Next</button>
+      </div>
+    ` : ""}
+  `;
+}
+
+function rerenderPaginatedList(containerId) {
+  if (containerId === "my-issues") return renderOverview(loadCache("overview"));
+  if (containerId === "em-issues") return renderOverview(loadCache("overview"));
+  if (containerId === "attention-list") return renderAttention(loadCache("attention"));
+  if (containerId === "support-issues") return renderSupport(loadCache("support"));
+  if (containerId.startsWith("sprint-tickets-")) return renderSprint(loadCache("sprint"));
+}
+
+function activatePage(page) {
+  const target = sections.includes(page) || page === "settings" ? page : "team";
+  document.querySelectorAll(".page-section").forEach((section) => {
+    section.hidden = section.dataset.page !== target;
+  });
+  document.querySelectorAll("[data-page-target]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.pageTarget === target);
+  });
+  if (location.hash !== `#${target}`) {
+    history.replaceState(null, "", `#${target}`);
+  }
+}
+
 function hydrateSettings() {
   const settings = loadSettings();
   const form = document.getElementById("settings-form");
@@ -382,6 +655,24 @@ function readSettingsForm() {
 
 function parseLines(value) {
   return value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+function groupCount(items, keyFn) {
+  const counts = new Map();
+  for (const item of items) {
+    const key = keyFn(item) || "Unknown";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function shortName(value) {
+  return String(value || "Unknown")
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function daysUntil(isoDate) {
@@ -433,6 +724,22 @@ function setGlobalCacheState(state) {
 }
 
 document.addEventListener("click", async (event) => {
+  const navButton = event.target.closest("[data-page-target]");
+  if (navButton) {
+    activatePage(navButton.dataset.pageTarget);
+    return;
+  }
+
+  const pageButton = event.target.closest("[data-page-list]");
+  if (pageButton) {
+    const containerId = pageButton.dataset.pageList;
+    const delta = Number(pageButton.dataset.pageDelta || 0);
+    paginationState[containerId] = paginationState[containerId] || { page: 1 };
+    paginationState[containerId].page += delta;
+    rerenderPaginatedList(containerId);
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-refresh]");
   if (refreshButton) {
     const section = refreshButton.dataset.refresh;
@@ -442,7 +749,8 @@ document.addEventListener("click", async (event) => {
       if (section === "overview") renderOverview(cache);
       if (section === "attention") renderAttention(cache);
       if (section === "team") renderTeam(cache);
-      if (section === "boards") renderBoards(cache);
+      if (section === "sprint") renderSprint(cache);
+      if (section === "support") renderSupport(cache);
       if (section === "trackers") renderTrackers(cache);
     } finally {
       refreshButton.textContent = "Refresh";
@@ -457,7 +765,8 @@ document.getElementById("refresh-all").addEventListener("click", async () => {
     if (section === "overview") renderOverview(cache);
     if (section === "attention") renderAttention(cache);
     if (section === "team") renderTeam(cache);
-    if (section === "boards") renderBoards(cache);
+    if (section === "sprint") renderSprint(cache);
+    if (section === "support") renderSupport(cache);
     if (section === "trackers") renderTrackers(cache);
   }
   setGlobalCacheState("warm");
@@ -470,10 +779,12 @@ document.getElementById("clear-cache").addEventListener("click", () => {
 
 document.getElementById("save-settings").addEventListener("click", () => {
   saveSettings(readSettingsForm());
-  for (const section of ["team", "boards", "trackers"]) {
+  for (const section of ["team", "sprint", "support", "trackers"]) {
     saveCache(section, buildMockPayload(section, loadSettings()), "settings");
   }
   renderAll();
 });
+
+window.addEventListener("hashchange", () => activatePage(location.hash.replace("#", "")));
 
 renderAll();

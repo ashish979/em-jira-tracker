@@ -28,6 +28,13 @@ npm run dev:jira
 
 Open `http://localhost:4174`.
 
+The main console is page-based rather than one long scroll:
+
+- Team: workload radar, stale-item signals, and member ticket details.
+- Sprint: active sprint timing, grouping, coverage, and paginated tickets.
+- Support: customer support attention filter `18377`.
+- Overview, Attention, Trackers, and Settings stay separate pages.
+
 ## Current State
 
 The UI runs with representative mock Jira data. The backend modules in

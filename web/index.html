@@ -16,13 +16,14 @@
             <h1>Jira Command Center</h1>
           </div>
         </div>
-        <nav class="nav-list">
-          <a href="#overview">Overview</a>
-          <a href="#attention">Attention</a>
-          <a href="#team">Team</a>
-          <a href="#boards">Boards</a>
-          <a href="#trackers">Trackers</a>
-          <a href="#settings">Settings</a>
+        <nav class="nav-list" id="nav-list">
+          <button data-page-target="team">Team</button>
+          <button data-page-target="sprint">Sprint</button>
+          <button data-page-target="overview">Overview</button>
+          <button data-page-target="attention">Attention</button>
+          <button data-page-target="support">Support</button>
+          <button data-page-target="trackers">Trackers</button>
+          <button data-page-target="settings">Settings</button>
         </nav>
         <div class="terminal-note">
           <span>cache:</span>
@@ -42,7 +43,32 @@
           </div>
         </header>
 
-        <section id="overview" class="section-band">
+        <section id="team" class="section-band page-section" data-page="team">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">team</p>
+              <h3>Workload radar</h3>
+            </div>
+            <button class="command-button" data-refresh="team">Refresh</button>
+          </div>
+          <div class="meta-line" id="team-meta"></div>
+          <div class="team-command" id="team-command"></div>
+          <div class="team-grid" id="team-list"></div>
+        </section>
+
+        <section id="sprint" class="section-band page-section" data-page="sprint">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">sprint</p>
+              <h3>Active sprint command view</h3>
+            </div>
+            <button class="command-button" data-refresh="sprint">Refresh</button>
+          </div>
+          <div class="meta-line" id="sprint-meta"></div>
+          <div class="sprint-view" id="sprint-view"></div>
+        </section>
+
+        <section id="overview" class="section-band page-section" data-page="overview">
           <div class="section-heading">
             <div>
               <p class="eyebrow">overview</p>
@@ -70,7 +96,7 @@
           </div>
         </section>
 
-        <section id="attention" class="section-band">
+        <section id="attention" class="section-band page-section" data-page="attention">
           <div class="section-heading">
             <div>
               <p class="eyebrow">attention</p>
@@ -82,31 +108,19 @@
           <div class="attention-list" id="attention-list"></div>
         </section>
 
-        <section id="team" class="section-band">
+        <section id="support" class="section-band page-section" data-page="support">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">team</p>
-              <h3>Workload, boards, and tickets</h3>
+              <p class="eyebrow">support</p>
+              <h3>Customer support attention</h3>
             </div>
-            <button class="command-button" data-refresh="team">Refresh</button>
+            <button class="command-button" data-refresh="support">Refresh</button>
           </div>
-          <div class="meta-line" id="team-meta"></div>
-          <div class="team-grid" id="team-list"></div>
+          <div class="meta-line" id="support-meta"></div>
+          <div class="support-view" id="support-view"></div>
         </section>
 
-        <section id="boards" class="section-band">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">boards</p>
-              <h3>Sprint and backlog view</h3>
-            </div>
-            <button class="command-button" data-refresh="boards">Refresh</button>
-          </div>
-          <div class="meta-line" id="boards-meta"></div>
-          <div class="board-grid" id="board-grid"></div>
-        </section>
-
-        <section id="trackers" class="section-band">
+        <section id="trackers" class="section-band page-section" data-page="trackers">
           <div class="section-heading">
             <div>
               <p class="eyebrow">trackers</p>
@@ -118,7 +132,7 @@
           <div class="tracker-grid" id="tracker-grid"></div>
         </section>
 
-        <section id="settings" class="section-band">
+        <section id="settings" class="section-band page-section" data-page="settings">
           <div class="section-heading">
             <div>
               <p class="eyebrow">settings</p>

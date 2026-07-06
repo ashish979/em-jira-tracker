@@ -72,6 +72,13 @@ export function createJiraClient({ siteUrl, email, apiToken }) {
     return request(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/sprint?state=active`);
   }
 
+  async function getSprintIssues(sprintId, { fields = [], jql = "", limit = 1000 } = {}) {
+    const params = new URLSearchParams({ maxResults: "100" });
+    if (jql) params.set("jql", jql);
+    for (const field of fields) params.append("fields", field);
+    return pagedAgile(`/rest/agile/1.0/sprint/${encodeURIComponent(sprintId)}/issue`, params, "issues", limit);
+  }
+
   async function getBoardIssues(boardId, { fields = [], jql = "", limit = 1000 } = {}) {
     const params = new URLSearchParams({ maxResults: "100" });
     if (jql) params.set("jql", jql);
@@ -131,6 +138,7 @@ export function createJiraClient({ siteUrl, email, apiToken }) {
     getFields,
     getBoard,
     getActiveSprints,
+    getSprintIssues,
     getBoardIssues,
     getBacklog,
   };
@@ -141,6 +149,8 @@ export function normalizeIssue(issue, emField, siteUrl = "") {
   const assignee = fields.assignee || {};
   const status = fields.status || {};
   const priority = fields.priority || {};
+  const issueType = fields.issuetype || {};
+  const project = fields.project || {};
   const em = emField ? fields[emField] : null;
 
   const statusChangedAt = fields.statuscategorychangedate || fields.statusCategoryChangedDate || null;
@@ -149,6 +159,9 @@ export function normalizeIssue(issue, emField, siteUrl = "") {
     key: issue.key,
     summary: fields.summary || "",
     status: status.name || "Unknown",
+    statusCategory: status.statusCategory?.key || null,
+    type: issueType.name || "Issue",
+    project: project.key || null,
     priority: priority.name || "None",
     assignee: assignee.displayName || assignee.emailAddress || "Unassigned",
     em: em?.displayName || em?.emailAddress || em?.value || null,
