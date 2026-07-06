@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-hide-done-v1";
+const CACHE_VERSION = "2026-07-06-team-links-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -324,6 +324,7 @@ function renderTeamCommand(members) {
   const sorted = [...members].sort((a, b) => (b.active || 0) - (a.active || 0));
   const noSprintTickets = members.filter((member) => !(member.boards || []).some((board) => board.active > 0 || board.workedOn > 0));
   const stale = members.filter((member) => (member.oldest || 0) > 14);
+  const memberNames = members.map((member) => member.member);
   document.getElementById("team-command").innerHTML = `
     <div class="team-radar-card">
       <h4>Workload shape</h4>
@@ -332,7 +333,7 @@ function renderTeamCommand(members) {
           const width = Math.min(100, Math.round(((member.active || 0) / Math.max(1, sorted[0]?.active || 1)) * 100));
           return `
             <div class="load-row">
-              <span>${escapeHtml(shortName(member.member))}</span>
+              <a href="#${escapeAttribute(memberAnchorId(member.member))}" data-member-target="${escapeAttribute(memberAnchorId(member.member))}">${escapeHtml(shortName(member.member))}</a>
               <div class="load-track"><div style="width: ${width}%"></div></div>
               <strong>${member.active || 0}</strong>
             </div>
@@ -343,17 +344,23 @@ function renderTeamCommand(members) {
     <div class="team-radar-card">
       <h4>EM signals</h4>
       <div class="signal-grid">
-        ${renderSignal("No sprint activity", noSprintTickets.length, noSprintTickets.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear")}
-        ${renderSignal("Stale oldest item", stale.length, stale.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear")}
-        ${renderSignal("Total active", members.reduce((sum, member) => sum + (member.active || 0), 0), "assigned across team")}
-        ${renderSignal("In progress", members.reduce((sum, member) => sum + (member.inProgress || 0), 0), "currently moving")}
+        ${renderSignal("No sprint activity", noSprintTickets.length, noSprintTickets.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear", teamIssueSearchUrl(noSprintTickets.map((member) => member.member)))}
+        ${renderSignal("Stale oldest item", stale.length, stale.map((member) => shortName(member.member)).slice(0, 6).join(", ") || "clear", teamIssueSearchUrl(stale.map((member) => member.member), "ORDER BY updated ASC"))}
+        ${renderSignal("Total active", members.reduce((sum, member) => sum + (member.active || 0), 0), "assigned across team", teamIssueSearchUrl(memberNames, "ORDER BY updated ASC"))}
+        ${renderSignal("In progress", members.reduce((sum, member) => sum + (member.inProgress || 0), 0), "currently moving", teamIssueSearchUrl(memberNames, "AND statusCategory = \"In Progress\" ORDER BY updated ASC"))}
       </div>
     </div>
   `;
 }
 
-function renderSignal(label, value, detail) {
-  return `<div class="signal"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small></div>`;
+function renderSignal(label, value, detail, url) {
+  return `
+    <a class="signal" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
+      <span>${escapeHtml(label)}</span>
+      <strong>${value}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </a>
+  `;
 }
 
 function renderSprint(cache) {
@@ -543,18 +550,19 @@ function renderIssue(item) {
 function renderTeamMember(member) {
   const tickets = (member.tickets?.length ? member.tickets : member.recentTickets || []).filter(isNotDone);
   const boards = member.boards || [];
+  const memberIssueUrl = teamIssueSearchUrl([member.member], "ORDER BY updated ASC");
   return `
-    <article class="team-card">
+    <article class="team-card" id="${escapeAttribute(memberAnchorId(member.member))}">
       <div class="team-card-head">
         <div>
           <h4>${escapeHtml(member.member)}</h4>
           <p>${escapeHtml(member.attention || "healthy")}</p>
         </div>
-        <span class="tag ${member.attention === "healthy" ? "" : "warn"}">${member.active || 0} active</span>
+        <a class="tag team-action-tag ${member.attention === "healthy" ? "" : "warn"}" href="${escapeAttribute(memberIssueUrl)}" target="_blank" rel="noopener noreferrer">${member.active || 0} active</a>
       </div>
       <div class="team-metrics">
-        <span><strong>${member.inProgress || 0}</strong> in progress</span>
-        <span><strong>${Number.isFinite(member.oldest) ? member.oldest : 0}d</strong> oldest</span>
+        <a href="${escapeAttribute(teamIssueSearchUrl([member.member], "AND statusCategory = \"In Progress\" ORDER BY updated ASC"))}" target="_blank" rel="noopener noreferrer"><strong>${member.inProgress || 0}</strong> in progress</a>
+        <a href="${escapeAttribute(memberIssueUrl)}" target="_blank" rel="noopener noreferrer"><strong>${Number.isFinite(member.oldest) ? member.oldest : 0}d</strong> oldest</a>
         <span><strong>${boards.length}</strong> boards</span>
       </div>
       ${boards.length ? `
@@ -563,10 +571,10 @@ function renderTeamMember(member) {
           ${boards.map((board) => `
             <div class="board-work">
               <div>
-                <span class="key">board ${escapeHtml(board.id)}</span>
-                <strong>${escapeHtml(board.name)}</strong>
+                <a class="key" href="${escapeAttribute(boardHref(board.id))}" target="_blank" rel="noopener noreferrer">board ${escapeHtml(board.id)}</a>
+                <a class="board-name-link" href="${escapeAttribute(boardHref(board.id))}" target="_blank" rel="noopener noreferrer">${escapeHtml(board.name)}</a>
               </div>
-              <span>${board.active || 0} active / ${board.workedOn || 0} worked</span>
+              <a class="board-work-count" href="${escapeAttribute(teamIssueSearchUrl([member.member], "ORDER BY updated DESC"))}" target="_blank" rel="noopener noreferrer">${board.active || 0} active / ${board.workedOn || 0} worked</a>
             </div>
           `).join("")}
         </div>
@@ -710,6 +718,23 @@ function issueHref(item) {
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/${item.key}`;
 }
 
+function boardHref(boardId) {
+  return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/secure/RapidBoard.jspa?rapidView=${encodeURIComponent(boardId)}`;
+}
+
+function teamIssueSearchUrl(members, suffix = "ORDER BY updated DESC") {
+  const assignees = members.filter(Boolean);
+  const assigneeClause = assignees.length
+    ? `assignee in (${assignees.map((member) => `"${member.replace(/"/g, "\\\"")}"`).join(", ")})`
+    : "assignee is not EMPTY";
+  const jql = `${assigneeClause} AND resolution = EMPTY ${suffix}`.trim();
+  return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?jql=${encodeURIComponent(jql)}`;
+}
+
+function memberAnchorId(member) {
+  return `team-member-${String(member || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -733,6 +758,14 @@ function setGlobalCacheState(state) {
 }
 
 document.addEventListener("click", async (event) => {
+  const memberLink = event.target.closest("[data-member-target]");
+  if (memberLink) {
+    event.preventDefault();
+    activatePage("team");
+    document.getElementById(memberLink.dataset.memberTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
   const navButton = event.target.closest("[data-page-target]");
   if (navButton) {
     activatePage(navButton.dataset.pageTarget);
