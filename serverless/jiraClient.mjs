@@ -152,6 +152,9 @@ export function normalizeIssue(issue, emField, siteUrl = "") {
   const issueType = fields.issuetype || {};
   const project = fields.project || {};
   const em = emField ? fields[emField] : null;
+  const parent = normalizeParent(fields.parent, siteUrl)
+    || normalizeParent(fields.customfield_10014, siteUrl)
+    || normalizeParent(fields.customfield_10063, siteUrl);
 
   const statusChangedAt = fields.statuscategorychangedate || fields.statusCategoryChangedDate || null;
 
@@ -164,13 +167,44 @@ export function normalizeIssue(issue, emField, siteUrl = "") {
     project: project.key || null,
     priority: priority.name || "None",
     assignee: assignee.displayName || assignee.emailAddress || "Unassigned",
+    assigneeAccountId: assignee.accountId || null,
     em: em?.displayName || em?.emailAddress || em?.value || null,
+    parent,
     due: fields.duedate || null,
     updated: fields.updated || null,
     statusCategoryChangedDate: statusChangedAt,
     ageDays: ageDays(statusChangedAt || fields.updated || issue.created),
     labels: fields.labels || [],
     url: siteUrl ? `${siteUrl.replace(/\/$/, "")}/browse/${issue.key}` : issue.self || null,
+  };
+}
+
+function normalizeParent(value, siteUrl) {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeParent(item, siteUrl)).find(Boolean) || null;
+  }
+  if (typeof value === "string") {
+    return parentShape(value, value, "Epic", null, siteUrl);
+  }
+  if (typeof value !== "object") return null;
+
+  const fields = value.fields || {};
+  const key = value.key || value.value || value.name || value.id;
+  if (!key) return null;
+  const summary = fields.summary || value.summary || value.name || value.value || key;
+  const type = fields.issuetype?.name || value.type || "Epic";
+  const status = fields.status?.name || value.status?.name || value.status || null;
+  return parentShape(key, summary, type, status, siteUrl);
+}
+
+function parentShape(key, summary, type, status, siteUrl) {
+  return {
+    key,
+    summary,
+    type,
+    status,
+    url: siteUrl ? `${siteUrl.replace(/\/$/, "")}/browse/${key}` : null,
   };
 }
 

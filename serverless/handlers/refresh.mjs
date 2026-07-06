@@ -13,6 +13,9 @@ const baseFields = [
   "statuscategorychangedate",
   "created",
   "labels",
+  "parent",
+  "customfield_10014",
+  "customfield_10063",
 ];
 
 export async function refreshHandler(event = {}, env = process.env) {
@@ -187,6 +190,7 @@ async function loadSprintSummary(jira, board, fields, emField, members, siteUrl)
     : { issues: [] };
   const tickets = (sprintIssues.issues || []).map((issue) => normalizeIssue(issue, emField, siteUrl)).filter(isNotDone);
   const assigneeCounts = groupCount(tickets, (ticket) => ticket.assignee || "Unassigned");
+  const epics = buildEpicGroups(tickets);
   const memberCoverage = members.map((member) => {
     const display = memberDisplay(member);
     const count = tickets.filter((ticket) => sameAssignee(ticket.assignee, member, display)).length;
@@ -222,6 +226,7 @@ async function loadSprintSummary(jira, board, fields, emField, members, siteUrl)
       byPriority: groupCount(tickets, (ticket) => ticket.priority || "None"),
       byType: groupCount(tickets, (ticket) => ticket.type || "Issue"),
     },
+    epics,
     coverage: {
       withTickets: memberCoverage.filter((member) => member.hasTicket),
       withoutTickets: memberCoverage.filter((member) => !member.hasTicket),
@@ -305,6 +310,46 @@ function groupCount(items, keyFn) {
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function buildEpicGroups(tickets) {
+  const groups = new Map();
+  for (const ticket of tickets) {
+    const parent = ticket.parent || {
+      key: "NO_EPIC",
+      summary: "No epic / parent",
+      type: "Unmapped",
+      status: null,
+      url: null,
+    };
+    if (!groups.has(parent.key)) {
+      groups.set(parent.key, {
+        key: parent.key,
+        summary: parent.summary || parent.key,
+        type: parent.type || "Epic",
+        status: parent.status || null,
+        url: parent.url || null,
+        tickets: [],
+      });
+    }
+    groups.get(parent.key).tickets.push(ticket);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      totals: {
+        tickets: group.tickets.length,
+        inProgress: group.tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+        blocked: group.tickets.filter((ticket) => ticket.labels.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length,
+        unassigned: group.tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+      },
+      groups: {
+        byStatus: groupCount(group.tickets, (ticket) => ticket.status || "Unknown"),
+        byAssignee: groupCount(group.tickets, (ticket) => ticket.assignee || "Unassigned"),
+      },
+    }))
+    .sort((a, b) => b.totals.tickets - a.totals.tickets || a.summary.localeCompare(b.summary));
 }
 
 function memberDisplay(member) {

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-team-links-v1";
+const CACHE_VERSION = "2026-07-06-sprint-epics-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -193,7 +193,15 @@ function buildBoards(tracked) {
 
 function buildSprint(tracked, members) {
   return buildBoards(tracked).map((board) => {
-    const tickets = seed.issues.filter(isNotDone).map((item, index) => ({ ...item, assignee: members[index % Math.max(1, members.length)] || item.assignee }));
+    const mockEpics = [
+      { key: "SC-1000", summary: "Identity lifecycle controls", type: "Epic", status: "In Progress", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/SC-1000` },
+      { key: "SC-1021", summary: "Profile reliability", type: "Epic", status: "To Do", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/SC-1021` },
+    ];
+    const tickets = seed.issues.filter(isNotDone).map((item, index) => ({
+      ...item,
+      assignee: members[index % Math.max(1, members.length)] || item.assignee,
+      parent: mockEpics[index % mockEpics.length],
+    }));
     return {
       ...board,
       sprint: {
@@ -219,6 +227,7 @@ function buildSprint(tracked, members) {
         byPriority: groupCount(tickets, (ticket) => ticket.priority),
         byType: groupCount(tickets, () => "Task"),
       },
+      epics: buildEpicGroups(tickets),
       coverage: {
         withTickets: members.slice(0, 4).map((member) => ({ member, display: member, count: 1, hasTicket: true })),
         withoutTickets: members.slice(4, 8).map((member) => ({ member, display: member, count: 0, hasTicket: false })),
@@ -366,9 +375,6 @@ function renderSignal(label, value, detail, url) {
 function renderSprint(cache) {
   setMeta("sprint", cache);
   document.getElementById("sprint-view").innerHTML = cache.payload.map(renderSprintBoard).join("");
-  for (const board of cache.payload) {
-    renderPaginatedList(`sprint-tickets-${board.id}`, board.tickets || [], renderIssue);
-  }
 }
 
 function renderSprintBoard(board) {
@@ -388,42 +394,42 @@ function renderSprintBoard(board) {
   const statusGroupId = `sprint-status-${board.id}`;
   const assigneeGroupId = `sprint-assignee-${board.id}`;
   const priorityGroupId = `sprint-priority-${board.id}`;
-  const ticketListId = `sprint-tickets-${board.id}`;
+  const epics = board.epics?.length ? board.epics : buildEpicGroups(tickets);
   return `
     <article class="sprint-board">
       <div class="sprint-hero">
         <div>
-          <span class="eyebrow">board ${escapeHtml(board.id)}</span>
+          <a class="eyebrow" href="${escapeAttribute(boardHref(board.id))}" target="_blank" rel="noopener noreferrer">board ${escapeHtml(board.id)}</a>
           <h4>${escapeHtml(sprint.name)}</h4>
           <p>${escapeHtml(board.name)}${sprint.goal ? ` · ${escapeHtml(sprint.goal)}` : ""}</p>
         </div>
-        <span class="sprint-date ${sprint.isPastEndDate ? "danger" : ""}">${escapeHtml(endCopy)}</span>
+        <a class="sprint-date ${sprint.isPastEndDate ? "danger" : ""}" href="${escapeAttribute(boardHref(board.id))}" target="_blank" rel="noopener noreferrer">${escapeHtml(endCopy)}</a>
       </div>
       <div class="metric-grid compact">
-        ${renderMetric("Sprint tickets", tickets.length, "open only")}
-        ${renderMetric("In progress", board.totals?.inProgress || 0, "active motion")}
-        ${renderMetric("Unassigned", tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap")}
-        ${renderMetric("Backlog", board.totals?.backlog || 0, "outside sprint")}
+        ${renderMetric("Sprint tickets", tickets.length, "open only", sprintSearchUrl(board))}
+        ${renderMetric("In progress", board.totals?.inProgress || 0, "active motion", sprintSearchUrl(board, "AND statusCategory = \"In Progress\" ORDER BY updated DESC"))}
+        ${renderMetric("Unassigned", tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap", sprintSearchUrl(board, "AND assignee is EMPTY ORDER BY updated DESC"))}
+        ${renderMetric("Backlog", board.totals?.backlog || 0, "outside sprint", `${boardHref(board.id)}&view=planning`)}
       </div>
       <div class="progress-bar large"><div class="progress-fill" style="width: ${Math.min(100, progress)}%"></div></div>
       <div class="ops-grid">
-        ${renderGroupPanel("By status", board.groups?.byStatus || [], statusGroupId)}
-        ${renderGroupPanel("By assignee", board.groups?.byAssignee || [], assigneeGroupId)}
-        ${renderGroupPanel("By priority", board.groups?.byPriority || [], priorityGroupId)}
+        ${renderGroupPanel("By status", board.groups?.byStatus || [], statusGroupId, (item) => sprintSearchUrl(board, `AND status = ${jqlQuote(item.name)} ORDER BY updated DESC`))}
+        ${renderGroupPanel("By assignee", board.groups?.byAssignee || [], assigneeGroupId, (item) => sprintAssigneeSearchUrl(board, item.name))}
+        ${renderGroupPanel("By priority", board.groups?.byPriority || [], priorityGroupId, (item) => sprintPrioritySearchUrl(board, item.name))}
       </div>
       <div class="coverage-grid">
         <div class="panel">
-          <div class="panel-heading"><h4>Has sprint tickets</h4><span>${board.coverage?.withTickets?.length || 0}</span></div>
-          <div class="person-chip-list">${(board.coverage?.withTickets || []).map((person) => `<span class="person-chip">${escapeHtml(shortName(person.member))}<strong>${person.count}</strong></span>`).join("") || `<span class="empty-state">No one mapped yet</span>`}</div>
+          <div class="panel-heading"><h4>Has sprint tickets</h4>${renderCountLink(board.coverage?.withTickets?.length || 0, sprintSearchUrl(board))}</div>
+          <div class="person-chip-list">${(board.coverage?.withTickets || []).map((person) => `<a class="person-chip" href="${escapeAttribute(sprintAssigneeSearchUrl(board, person.member))}" target="_blank" rel="noopener noreferrer">${escapeHtml(shortName(person.member))}<strong>${person.count}</strong></a>`).join("") || `<span class="empty-state">No one mapped yet</span>`}</div>
         </div>
         <div class="panel">
-          <div class="panel-heading"><h4>No sprint tickets</h4><span>${board.coverage?.withoutTickets?.length || 0}</span></div>
+          <div class="panel-heading"><h4>No sprint tickets</h4>${renderCountLink(board.coverage?.withoutTickets?.length || 0, boardHref(board.id))}</div>
           <div class="person-chip-list">${(board.coverage?.withoutTickets || []).map((person) => `<span class="person-chip muted">${escapeHtml(shortName(person.member))}</span>`).join("") || `<span class="empty-state">Everyone has sprint work</span>`}</div>
         </div>
       </div>
-      <div class="panel">
-          <div class="panel-heading"><h4>Sprint tickets</h4><span>${tickets.length} open issues</span></div>
-        <div id="${ticketListId}"></div>
+      <div class="panel sprint-ticket-panel">
+        <div class="panel-heading"><h4>Sprint tickets by epic</h4>${renderCountLink(tickets.length, sprintSearchUrl(board), "open issues")}</div>
+        <div class="sprint-epic-list">${epics.map((epic) => renderSprintEpic(epic, board)).join("") || `<span class="empty-state">No sprint tickets found</span>`}</div>
       </div>
     </article>
   `;
@@ -503,28 +509,74 @@ function renderTrackers(cache) {
   }).join("");
 }
 
-function renderMetric(label, value, detail) {
-  return `<article class="metric"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small></article>`;
+function renderMetric(label, value, detail, url = "") {
+  const body = `<span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small>`;
+  return url
+    ? `<a class="metric metric-link" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${body}</a>`
+    : `<article class="metric">${body}</article>`;
 }
 
-function renderGroupPanel(title, items, id = "") {
+function renderGroupPanel(title, items, id = "", linkFactory = null) {
   return `
     <div class="group-panel"${id ? ` id="${escapeAttribute(id)}"` : ""}>
       <h4>${escapeHtml(title)}</h4>
       <div class="group-bars">
         ${items.slice(0, 10).map((item) => {
           const max = Math.max(1, items[0]?.count || 1);
+          const count = linkFactory
+            ? `<a href="${escapeAttribute(linkFactory(item))}" target="_blank" rel="noopener noreferrer">${item.count}</a>`
+            : `<strong>${item.count}</strong>`;
           return `
             <div class="group-row">
               <span>${escapeHtml(item.name)}</span>
               <div class="load-track"><div style="width: ${Math.round((item.count / max) * 100)}%"></div></div>
-              <strong>${item.count}</strong>
+              ${count}
             </div>
           `;
         }).join("") || `<span class="empty-state">No data</span>`}
       </div>
     </div>
   `;
+}
+
+function renderSprintEpic(epic, board) {
+  const tickets = (epic.tickets || []).filter(isNotDone);
+  const epicUrl = epic.key === "NO_EPIC" ? sprintSearchUrl(board, "AND parent is EMPTY AND \"Epic Link\" is EMPTY ORDER BY updated DESC") : sprintEpicSearchUrl(board, epic.key);
+  const inProgress = epic.totals?.inProgress ?? tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length;
+  const blocked = epic.totals?.blocked ?? tickets.filter((ticket) => ticket.labels?.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length;
+  return `
+    <article class="sprint-epic">
+      <div class="sprint-epic-head">
+        <div>
+          ${epic.key === "NO_EPIC" ? `<span class="key">no epic</span>` : `<a class="key" href="${escapeAttribute(epic.url || epicUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(epic.key)}</a>`}
+          <h5>${escapeHtml(epic.summary || epic.key)}</h5>
+        </div>
+        <div class="epic-stats">
+          ${renderCountLink(tickets.length, epicUrl, "open")}
+          ${renderCountLink(inProgress, sprintSearchUrl(board, `${epicJqlClause(epic.key)} AND statusCategory = \"In Progress\" ORDER BY updated DESC`), "moving")}
+          ${renderCountLink(blocked, sprintSearchUrl(board, `${epicJqlClause(epic.key)} AND (labels = blocked OR status = ${jqlQuote("Blocked")}) ORDER BY updated DESC`), "blocked")}
+        </div>
+      </div>
+      <div class="compact-ticket-list">
+        ${tickets.map(renderCompactIssue).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderCompactIssue(item) {
+  return `
+    <a class="compact-ticket" href="${escapeAttribute(issueHref(item))}" target="_blank" rel="noopener noreferrer">
+      <span>${escapeHtml(item.key)}</span>
+      <strong>${escapeHtml(item.summary || "Untitled issue")}</strong>
+      <em>${escapeHtml(item.assignee || "Unassigned")}</em>
+      <small>${escapeHtml(item.status || "Unknown")}</small>
+    </a>
+  `;
+}
+
+function renderCountLink(value, url, label = "") {
+  return `<a class="count-link" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${value}${label ? ` <span>${escapeHtml(label)}</span>` : ""}</a>`;
 }
 
 function renderIssue(item) {
@@ -685,6 +737,35 @@ function groupCount(items, keyFn) {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
+function buildEpicGroups(tickets) {
+  const groups = new Map();
+  for (const ticket of tickets) {
+    const parent = ticket.parent || { key: "NO_EPIC", summary: "No epic / parent", type: "Unmapped", status: null, url: null };
+    if (!groups.has(parent.key)) {
+      groups.set(parent.key, {
+        key: parent.key,
+        summary: parent.summary || parent.key,
+        type: parent.type || "Epic",
+        status: parent.status || null,
+        url: parent.url || null,
+        tickets: [],
+      });
+    }
+    groups.get(parent.key).tickets.push(ticket);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      totals: {
+        tickets: group.tickets.length,
+        inProgress: group.tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+        blocked: group.tickets.filter((ticket) => ticket.labels?.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length,
+        unassigned: group.tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
+      },
+    }))
+    .sort((a, b) => b.totals.tickets - a.totals.tickets || a.summary.localeCompare(b.summary));
+}
+
 function shortName(value) {
   return String(value || "Unknown")
     .split("@")[0]
@@ -720,6 +801,43 @@ function issueHref(item) {
 
 function boardHref(boardId) {
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/secure/RapidBoard.jspa?rapidView=${encodeURIComponent(boardId)}`;
+}
+
+function jiraSearchUrl(jql) {
+  return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?jql=${encodeURIComponent(jql)}`;
+}
+
+function sprintSearchUrl(board, suffix = "ORDER BY updated DESC") {
+  const sprintId = board.sprint?.id;
+  const base = sprintId ? `sprint = ${sprintId}` : `project is not EMPTY`;
+  return jiraSearchUrl(`${base} AND resolution = EMPTY ${suffix}`.trim());
+}
+
+function sprintAssigneeSearchUrl(board, assignee) {
+  const clause = assignee === "Unassigned"
+    ? "AND assignee is EMPTY"
+    : `AND assignee = ${jqlQuote(assignee)}`;
+  return sprintSearchUrl(board, `${clause} ORDER BY updated DESC`);
+}
+
+function sprintPrioritySearchUrl(board, priority) {
+  const clause = priority === "None"
+    ? "AND priority is EMPTY"
+    : `AND priority = ${jqlQuote(priority)}`;
+  return sprintSearchUrl(board, `${clause} ORDER BY updated DESC`);
+}
+
+function sprintEpicSearchUrl(board, epicKey) {
+  return sprintSearchUrl(board, `${epicJqlClause(epicKey)} ORDER BY updated DESC`);
+}
+
+function epicJqlClause(epicKey) {
+  if (epicKey === "NO_EPIC") return `AND parent is EMPTY AND "Epic Link" is EMPTY`;
+  return `AND (parent = ${jqlQuote(epicKey)} OR "Epic Link" = ${jqlQuote(epicKey)})`;
+}
+
+function jqlQuote(value) {
+  return `"${String(value || "").replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
 }
 
 function teamIssueSearchUrl(members, suffix = "ORDER BY updated DESC") {

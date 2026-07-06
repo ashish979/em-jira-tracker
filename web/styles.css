@@ -101,6 +101,15 @@ button {
   text-transform: uppercase;
 }
 
+a.eyebrow {
+  display: inline-block;
+  text-decoration: none;
+}
+
+a.eyebrow:hover {
+  text-decoration: underline;
+}
+
 .nav-list {
   display: grid;
   gap: 7px;
@@ -251,11 +260,23 @@ button {
 }
 
 .metric {
+  display: block;
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   background: var(--panel-2);
   padding: 13px;
   min-height: 94px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.metric-link:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.metric-link:hover strong {
+  color: var(--blue);
 }
 
 .metric span {
@@ -578,6 +599,18 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.group-row a {
+  color: var(--blue);
+  font-weight: 900;
+  text-align: right;
+  text-decoration: none;
+}
+
+.group-row a:hover,
+.count-link:hover {
+  text-decoration: underline;
+}
+
 .load-track {
   height: 9px;
   border-radius: 999px;
@@ -632,6 +665,89 @@ textarea:focus {
   gap: 14px;
 }
 
+.sprint-ticket-panel {
+  padding: 14px;
+}
+
+.sprint-epic-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sprint-epic {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.sprint-epic-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.sprint-epic h5 {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.epic-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.compact-ticket-list {
+  display: grid;
+  gap: 5px;
+}
+
+.compact-ticket {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) minmax(110px, 0.35fr) 112px;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text);
+  min-height: 34px;
+  padding: 6px 0 0;
+  text-decoration: none;
+}
+
+.compact-ticket span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.compact-ticket strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.compact-ticket em,
+.compact-ticket small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.compact-ticket:hover strong {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
 .sprint-hero,
 .support-header {
   display: flex;
@@ -653,7 +769,12 @@ textarea:focus {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 800;
+  text-decoration: none;
   white-space: nowrap;
+}
+
+.sprint-date:hover {
+  text-decoration: underline;
 }
 
 .sprint-date.danger {
@@ -679,6 +800,7 @@ textarea:focus {
   padding: 5px 8px;
   font-size: 12px;
   font-weight: 800;
+  text-decoration: none;
 }
 
 .person-chip.muted {
@@ -696,6 +818,19 @@ textarea:focus {
   font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.count-link {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.count-link span {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .pagination {
@@ -938,12 +1073,18 @@ textarea:focus {
 
   .team-card-head,
   .sprint-hero,
+  .sprint-epic-head,
   .support-header,
   .board-work,
-  .mini-ticket {
+  .mini-ticket,
+  .compact-ticket {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .epic-stats {
+    justify-content: flex-start;
   }
 
   .nav-list {
