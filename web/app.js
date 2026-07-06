@@ -60,15 +60,20 @@ function issue(key, summary, status, priority, em, assignee, dueInDays, ageDays,
 function loadSettings() {
   const saved = localStorage.getItem(`${CACHE_PREFIX}settings`);
   if (!saved) return defaultSettings;
-  const parsed = JSON.parse(saved);
-  if (parsed.settingsVersion !== CACHE_VERSION) {
-    return { ...defaultSettings, apiBaseUrl: parsed.apiBaseUrl || defaultSettings.apiBaseUrl };
+  try {
+    const parsed = JSON.parse(saved);
+    return { ...defaultSettings, ...parsed, settingsVersion: CACHE_VERSION };
+  } catch {
+    return defaultSettings;
   }
-  return { ...defaultSettings, ...parsed };
 }
 
 function saveSettings(settings) {
-  localStorage.setItem(`${CACHE_PREFIX}settings`, JSON.stringify(settings));
+  localStorage.setItem(`${CACHE_PREFIX}settings`, JSON.stringify({
+    ...defaultSettings,
+    ...settings,
+    settingsVersion: CACHE_VERSION,
+  }));
 }
 
 function loadCache(section) {
