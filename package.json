@@ -1,0 +1,11 @@
+{
+  "name": "jira-command-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 4173 --directory web",
+    "check": "node --check web/app.js && node --check serverless/jiraClient.mjs && node --check serverless/handlers/refresh.mjs && node --check serverless/storage/localStore.mjs && node --check scripts/discoverFields.mjs",
+    "discover:fields": "node scripts/discoverFields.mjs"
+  }
+}

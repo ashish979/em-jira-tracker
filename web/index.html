@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jira Command Center</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Dashboard navigation">
+        <div class="brand">
+          <span class="brand-mark">JC</span>
+          <div>
+            <p class="eyebrow">personal ops</p>
+            <h1>Jira Command Center</h1>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <a href="#overview">Overview</a>
+          <a href="#attention">Attention</a>
+          <a href="#team">Team</a>
+          <a href="#boards">Boards</a>
+          <a href="#trackers">Trackers</a>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div class="terminal-note">
+          <span>cache:</span>
+          <strong id="global-cache-state">warm</strong>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">manual refresh only</p>
+            <h2>EM control surface</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="refresh-all" title="Refresh all sections" aria-label="Refresh all sections">R</button>
+            <button class="icon-button" id="clear-cache" title="Clear local cache" aria-label="Clear local cache">C</button>
+          </div>
+        </header>
+
+        <section id="overview" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">overview</p>
+              <h3>Assigned and EM-owned work</h3>
+            </div>
+            <button class="command-button" data-refresh="overview">Refresh</button>
+          </div>
+          <div class="meta-line" id="overview-meta"></div>
+          <div class="metric-grid" id="overview-metrics"></div>
+          <div class="split-grid">
+            <div class="panel">
+              <div class="panel-heading">
+                <h4>My active tickets</h4>
+                <span id="my-ticket-count"></span>
+              </div>
+              <div class="issue-list" id="my-issues"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-heading">
+                <h4>EM field ownership</h4>
+                <span id="em-ticket-count"></span>
+              </div>
+              <div class="issue-list" id="em-issues"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="attention" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">attention</p>
+              <h3>Dates, stale work, blockers</h3>
+            </div>
+            <button class="command-button" data-refresh="attention">Refresh</button>
+          </div>
+          <div class="meta-line" id="attention-meta"></div>
+          <div class="attention-list" id="attention-list"></div>
+        </section>
+
+        <section id="team" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">team</p>
+              <h3>Workload by engineer</h3>
+            </div>
+            <button class="command-button" data-refresh="team">Refresh</button>
+          </div>
+          <div class="meta-line" id="team-meta"></div>
+          <div class="team-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Active</th>
+                  <th>In progress</th>
+                  <th>Oldest item</th>
+                  <th>Needs attention</th>
+                </tr>
+              </thead>
+              <tbody id="team-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="boards" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">boards</p>
+              <h3>Sprint and backlog view</h3>
+            </div>
+            <button class="command-button" data-refresh="boards">Refresh</button>
+          </div>
+          <div class="meta-line" id="boards-meta"></div>
+          <div class="board-grid" id="board-grid"></div>
+        </section>
+
+        <section id="trackers" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">trackers</p>
+              <h3>Saved filters and dashboard links</h3>
+            </div>
+            <button class="command-button" data-refresh="trackers">Refresh</button>
+          </div>
+          <div class="meta-line" id="trackers-meta"></div>
+          <div class="tracker-grid" id="tracker-grid"></div>
+        </section>
+
+        <section id="settings" class="section-band">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">settings</p>
+              <h3>Local configuration draft</h3>
+            </div>
+            <button class="command-button" id="save-settings">Save</button>
+          </div>
+          <form class="settings-grid" id="settings-form">
+            <label>
+              Jira site URL
+              <input name="jiraSiteUrl" placeholder="https://company.atlassian.net" />
+            </label>
+            <label>
+              Jira email
+              <input name="jiraEmail" placeholder="you@example.com" />
+            </label>
+            <label>
+              EM field id
+              <input name="emField" placeholder="customfield_12345" />
+            </label>
+            <label>
+              API base URL
+              <input name="apiBaseUrl" placeholder="leave blank for mock mode" />
+            </label>
+            <label class="wide">
+              Team members
+              <textarea name="teamMembers" rows="4" placeholder="One email or account id per line"></textarea>
+            </label>
+            <label class="wide">
+              Boards and filters
+              <textarea name="trackedItems" rows="4" placeholder="board:123 Platform board&#10;filter:456 Release blockers"></textarea>
+            </label>
+          </form>
+          <p class="settings-note">
+            API token is intentionally not stored here. It belongs in the backend environment or AWS secrets.
+          </p>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
