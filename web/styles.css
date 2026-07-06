@@ -1,16 +1,16 @@
 :root {
-  --bg: #12120f;
-  --panel: #1b1d17;
-  --panel-2: #22251d;
-  --line: #3f4935;
-  --line-soft: #2d3428;
-  --text: #f2f0d4;
-  --muted: #9ca586;
-  --green: #94d82d;
-  --amber: #f2c94c;
-  --red: #ff6b6b;
-  --blue: #73c2fb;
-  --shadow: rgba(0, 0, 0, 0.32);
+  --bg: #eef2ec;
+  --panel: #fbfcf7;
+  --panel-2: #f2f6ee;
+  --line: #9aa791;
+  --line-soft: #c9d2c1;
+  --text: #20271f;
+  --muted: #62705b;
+  --green: #247a35;
+  --amber: #9a6800;
+  --red: #b4232b;
+  --blue: #1c5f91;
+  --shadow: rgba(47, 62, 43, 0.14);
 }
 
 * {
@@ -24,8 +24,8 @@ html {
 body {
   margin: 0;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(rgba(33, 47, 30, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 47, 30, 0.04) 1px, transparent 1px),
     var(--bg);
   background-size: 18px 18px;
   color: var(--text);
@@ -55,7 +55,7 @@ button {
   top: 0;
   height: 100vh;
   border-right: 1px solid var(--line);
-  background: rgba(18, 18, 15, 0.94);
+  background: rgba(247, 250, 243, 0.96);
   padding: 22px;
   display: flex;
   flex-direction: column;
@@ -78,7 +78,8 @@ button {
   color: var(--green);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-weight: 800;
-  box-shadow: 0 0 24px rgba(148, 216, 45, 0.15);
+  background: #f8fbf4;
+  box-shadow: 0 0 24px rgba(36, 122, 53, 0.12);
 }
 
 .brand h1,
@@ -125,7 +126,7 @@ button {
 .terminal-note {
   margin-top: auto;
   border: 1px solid var(--line);
-  background: #0d0e0b;
+  background: #f7faf3;
   color: var(--muted);
   padding: 12px;
   font-family: "SFMono-Regular", Consolas, monospace;
@@ -156,7 +157,7 @@ button {
 .topbar {
   min-height: 76px;
   border: 1px solid var(--line);
-  background: rgba(27, 29, 23, 0.94);
+  background: rgba(251, 252, 247, 0.96);
   padding: 18px 20px;
   box-shadow: 0 16px 36px var(--shadow);
   min-width: 0;
@@ -174,7 +175,7 @@ button {
 .icon-button,
 .command-button {
   border: 1px solid var(--line);
-  background: #11130e;
+  background: #f7faf3;
   color: var(--text);
   min-height: 38px;
 }
@@ -195,13 +196,13 @@ button {
 .icon-button:hover,
 .command-button:hover {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(148, 216, 45, 0.12);
+  box-shadow: 0 0 0 2px rgba(36, 122, 53, 0.12);
 }
 
 .section-band,
 .panel {
   border: 1px solid var(--line);
-  background: rgba(27, 29, 23, 0.92);
+  background: rgba(251, 252, 247, 0.94);
 }
 
 .section-band {
@@ -290,7 +291,7 @@ button {
 .board-card,
 .tracker-card {
   border: 1px solid var(--line-soft);
-  background: #151711;
+  background: #f8faf4;
   padding: 12px;
 }
 
@@ -331,12 +332,14 @@ button {
 
 .tag.hot {
   color: var(--red);
-  border-color: rgba(255, 107, 107, 0.48);
+  border-color: rgba(180, 35, 43, 0.42);
+  background: #fff2f1;
 }
 
 .tag.warn {
   color: var(--amber);
-  border-color: rgba(242, 201, 76, 0.48);
+  border-color: rgba(154, 104, 0, 0.42);
+  background: #fff8df;
 }
 
 .attention-row {
@@ -371,7 +374,7 @@ td {
 
 th {
   color: var(--green);
-  background: #11130e;
+  background: #edf5e8;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
 }
@@ -388,7 +391,7 @@ td {
 .progress-bar {
   height: 8px;
   border: 1px solid var(--line);
-  background: #0d0e0b;
+  background: #e6ecdf;
   margin-top: 10px;
 }
 
@@ -419,7 +422,7 @@ input,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  background: #10120d;
+  background: #ffffff;
   color: var(--text);
   padding: 10px;
   outline: none;
@@ -428,7 +431,7 @@ textarea {
 input:focus,
 textarea:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(148, 216, 45, 0.12);
+  box-shadow: 0 0 0 2px rgba(36, 122, 53, 0.12);
 }
 
 .settings-note {
