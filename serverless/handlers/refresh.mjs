@@ -83,7 +83,8 @@ async function refreshPayload(section, body, config) {
   if (section === "team") {
     const members = parseLines(body?.settings?.teamMembers || "");
     const boards = parseTracked(body?.settings?.trackedItems || "", "board");
-    return Promise.all(members.map((member) => loadMemberSummary(jira, member, fields, emField, boards, siteUrl)));
+    const currentSprintBoards = await Promise.all(boards.map((board) => loadCurrentSprintBoard(jira, board, fields, emField, siteUrl)));
+    return Promise.all(members.map((member) => loadMemberSummary(jira, member, fields, emField, boards, siteUrl, currentSprintBoards)));
   }
 
   if (section === "sprint") {
@@ -109,7 +110,7 @@ async function refreshPayload(section, body, config) {
   return {};
 }
 
-async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl) {
+async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl, currentSprintBoards = []) {
   const jqlMember = member.includes("@") ? `"${member}"` : member;
   const [activeResult, recentResult, boardWork] = await Promise.all([
     jira.searchIssues({
@@ -129,15 +130,69 @@ async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl)
   const activeIssues = activeResult.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
   const recentIssues = recentResult.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
   const oldest = activeIssues.reduce((max, item) => Math.max(max, item.ageDays || 0), 0);
+  const display = memberDisplay(member);
+  const memberAccountIds = new Set(
+    [...activeIssues, ...recentIssues, ...boardWork.flatMap((board) => board.tickets || [])]
+      .map((ticket) => ticket.assigneeAccountId)
+      .filter(Boolean),
+  );
+  const sprintBoardWork = currentSprintBoards
+    .map((board) => {
+      const tickets = board.tickets.filter((ticket) => sameMemberTicket(ticket, member, display, memberAccountIds));
+      return {
+        id: board.id,
+        name: board.name,
+        sprint: board.sprint,
+        tickets,
+        count: tickets.length,
+      };
+    })
+    .filter((board) => board.count > 0);
+  const sprintTickets = sprintBoardWork.flatMap((board) => board.tickets);
   return {
     member,
     active: activeIssues.length,
-    inProgress: activeIssues.filter((item) => item.status.toLowerCase().includes("progress")).length,
+    inProgress: activeIssues.filter(isInProgress).length,
     oldest,
     attention: oldest > 8 ? "stale focus item" : activeIssues.length > 5 ? "capacity check" : "healthy",
     tickets: activeIssues.slice(0, 8),
     recentTickets: recentIssues.slice(0, 8),
     boards: boardWork.filter((board) => board.active || board.workedOn),
+    currentSprint: {
+      tickets: sprintTickets.length,
+      boards: sprintBoardWork.map((board) => ({
+        id: board.id,
+        name: board.name,
+        sprint: board.sprint,
+        count: board.count,
+      })),
+      sprintIds: [...new Set(currentSprintBoards.map((board) => board.sprint?.id).filter(Boolean))],
+      ticketSample: sprintTickets.slice(0, 8),
+    },
+  };
+}
+
+async function loadCurrentSprintBoard(jira, board, fields, emField, siteUrl) {
+  const [boardDetails, sprints] = await Promise.all([
+    jira.getBoard(board.id),
+    jira.getActiveSprints(board.id),
+  ]);
+  const sprint = sprints.values?.[0] || null;
+  const sprintIssues = sprint
+    ? await jira.getSprintIssues(sprint.id, { fields, limit: 1000 })
+    : { issues: [] };
+  return {
+    id: board.id,
+    name: board.name || boardDetails.name || `Board ${board.id}`,
+    sprint: sprint
+      ? {
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state,
+          endDate: sprint.endDate || null,
+        }
+      : null,
+    tickets: (sprintIssues.issues || []).map((issue) => normalizeIssue(issue, emField, siteUrl)).filter(isNotDone),
   };
 }
 
@@ -216,7 +271,7 @@ async function loadSprintSummary(jira, board, fields, emField, members, siteUrl)
     totals: {
       tickets: tickets.length,
       done: 0,
-      inProgress: tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+      inProgress: tickets.filter(isInProgress).length,
       unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
       backlog: backlog.issues?.length || 0,
     },
@@ -340,7 +395,7 @@ function buildEpicGroups(tickets) {
       ...group,
       totals: {
         tickets: group.tickets.length,
-        inProgress: group.tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+        inProgress: group.tickets.filter(isInProgress).length,
         blocked: group.tickets.filter((ticket) => ticket.labels.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length,
         unassigned: group.tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
       },
@@ -359,6 +414,10 @@ function memberDisplay(member) {
 function sameAssignee(assignee, member, display) {
   const normalizedAssignee = normalizePerson(assignee);
   return normalizedAssignee === normalizePerson(member) || normalizedAssignee.includes(normalizePerson(display));
+}
+
+function sameMemberTicket(ticket, member, display, memberAccountIds = new Set()) {
+  return (ticket.assigneeAccountId && memberAccountIds.has(ticket.assigneeAccountId)) || sameAssignee(ticket.assignee, member, display);
 }
 
 function normalizePerson(value) {
@@ -401,6 +460,10 @@ function countDueSoon(issues) {
 
 function isNotDone(issue) {
   return issue.statusCategory !== "done" && issue.status.toLowerCase() !== "done" && issue.status.toLowerCase() !== "closed" && issue.status.toLowerCase() !== "archived";
+}
+
+function isInProgress(issue) {
+  return issue.statusCategory === "indeterminate";
 }
 
 function toJqlField(fieldId) {

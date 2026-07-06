@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-no-resolution-filter-v1";
+const CACHE_VERSION = "2026-07-06-team-sprint-consistency-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -172,6 +172,12 @@ function buildTeam(members) {
       attention: oldest > 8 ? "stale focus item" : active > 5 ? "capacity check" : "healthy",
       tickets,
       recentTickets: tickets,
+      currentSprint: {
+        tickets: Math.max(0, 3 - (index % 4)),
+        boards: [{ id: "141", name: "User Profiles/Identities", sprint: { id: 11306, name: "SC-Sprint 8" }, count: Math.max(0, 3 - (index % 4)) }],
+        sprintIds: [11306],
+        ticketSample: tickets.slice(0, 3),
+      },
       boards: [
         {
           id: "141",
@@ -222,7 +228,7 @@ function buildSprint(tracked, members) {
       totals: {
         tickets: tickets.length,
         done: 0,
-        inProgress: tickets.filter((ticket) => ticket.status.includes("Progress")).length,
+        inProgress: tickets.filter(isInProgress).length,
         unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
         backlog: board.backlog,
       },
@@ -336,7 +342,8 @@ function renderTeam(cache) {
 
 function renderTeamCommand(members) {
   const sorted = [...members].sort((a, b) => (b.active || 0) - (a.active || 0));
-  const noSprintTickets = members.filter((member) => !(member.boards || []).some((board) => board.active > 0 || board.workedOn > 0));
+  const sprintSorted = [...members].sort((a, b) => (b.currentSprint?.tickets || 0) - (a.currentSprint?.tickets || 0));
+  const noSprintTickets = members.filter((member) => (member.currentSprint?.tickets || 0) === 0);
   const stale = members.filter((member) => (member.oldest || 0) > 14);
   const memberNames = members.map((member) => member.member);
   document.getElementById("team-command").innerHTML = `
@@ -350,6 +357,22 @@ function renderTeamCommand(members) {
               <a href="#${escapeAttribute(memberAnchorId(member.member))}" data-member-target="${escapeAttribute(memberAnchorId(member.member))}">${escapeHtml(shortName(member.member))}</a>
               <div class="load-track"><div style="width: ${width}%"></div></div>
               <strong>${member.active || 0}</strong>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+    <div class="team-radar-card">
+      <h4>Current sprint load</h4>
+      <div class="load-bars">
+        ${sprintSorted.map((member) => {
+          const sprintTickets = member.currentSprint?.tickets || 0;
+          const width = Math.min(100, Math.round((sprintTickets / Math.max(1, sprintSorted[0]?.currentSprint?.tickets || 1)) * 100));
+          return `
+            <div class="load-row">
+              <a href="${escapeAttribute(teamCurrentSprintSearchUrl(member))}" target="_blank" rel="noopener noreferrer">${escapeHtml(shortName(member.member))}</a>
+              <div class="load-track"><div style="width: ${width}%"></div></div>
+              <strong>${sprintTickets}</strong>
             </div>
           `;
         }).join("")}
@@ -547,7 +570,7 @@ function renderGroupPanel(title, items, id = "", linkFactory = null) {
 function renderSprintEpic(epic, board) {
   const tickets = (epic.tickets || []).filter(isNotDone);
   const epicUrl = epic.key === "NO_EPIC" ? sprintSearchUrl(board, "AND parent is EMPTY AND \"Epic Link\" is EMPTY ORDER BY updated DESC") : sprintEpicSearchUrl(board, epic.key);
-  const inProgress = epic.totals?.inProgress ?? tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length;
+  const inProgress = epic.totals?.inProgress ?? tickets.filter(isInProgress).length;
   const blocked = epic.totals?.blocked ?? tickets.filter((ticket) => ticket.labels?.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length;
   return `
     <article class="sprint-epic">
@@ -619,6 +642,7 @@ function renderTeamMember(member) {
   const tickets = (member.tickets?.length ? member.tickets : member.recentTickets || []).filter(isNotDone);
   const boards = member.boards || [];
   const memberIssueUrl = teamIssueSearchUrl([member.member], "ORDER BY updated ASC");
+  const currentSprintTickets = member.currentSprint?.tickets || 0;
   return `
     <article class="team-card" id="${escapeAttribute(memberAnchorId(member.member))}">
       <div class="team-card-head">
@@ -630,8 +654,8 @@ function renderTeamMember(member) {
       </div>
       <div class="team-metrics">
         <a href="${escapeAttribute(teamIssueSearchUrl([member.member], "AND statusCategory = \"In Progress\" ORDER BY updated ASC"))}" target="_blank" rel="noopener noreferrer"><strong>${member.inProgress || 0}</strong> in progress</a>
+        <a href="${escapeAttribute(teamCurrentSprintSearchUrl(member))}" target="_blank" rel="noopener noreferrer"><strong>${currentSprintTickets}</strong> in sprint</a>
         <a href="${escapeAttribute(memberIssueUrl)}" target="_blank" rel="noopener noreferrer"><strong>${Number.isFinite(member.oldest) ? member.oldest : 0}d</strong> oldest</a>
-        <span><strong>${boards.length}</strong> boards</span>
       </div>
       ${boards.length ? `
         <div class="team-subsection">
@@ -668,6 +692,11 @@ function renderMiniIssue(item) {
 function isNotDone(issue) {
   const status = String(issue.status || "").toLowerCase();
   return issue.statusCategory !== "done" && status !== "done" && status !== "closed" && status !== "archived";
+}
+
+function isInProgress(issue) {
+  const status = String(issue.status || "").toLowerCase();
+  return issue.statusCategory === "indeterminate" || status.includes("progress") || status.includes("development") || status.includes("review") || status.includes("qa");
 }
 
 function renderIssueLink(item, className) {
@@ -773,7 +802,7 @@ function buildEpicGroups(tickets) {
       ...group,
       totals: {
         tickets: group.tickets.length,
-        inProgress: group.tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
+        inProgress: group.tickets.filter(isInProgress).length,
         blocked: group.tickets.filter((ticket) => ticket.labels?.includes("blocked") || ticket.status.toLowerCase().includes("blocked")).length,
         unassigned: group.tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
       },
@@ -825,7 +854,7 @@ function jiraSearchUrl(jql) {
 function sprintSearchUrl(board, suffix = "ORDER BY updated DESC") {
   const sprintId = board.sprint?.id;
   const base = sprintId ? `sprint = ${sprintId}` : `project is not EMPTY`;
-  return jiraSearchUrl(`${base} ${suffix}`.trim());
+  return jiraSearchUrl(`${base} AND statusCategory != "Done" ${suffix}`.trim());
 }
 
 function sprintAssigneeSearchUrl(board, assignee) {
@@ -846,13 +875,22 @@ function sprintEpicSearchUrl(board, epicKey) {
   return sprintSearchUrl(board, `${epicJqlClause(epicKey)} ORDER BY updated DESC`);
 }
 
+function teamCurrentSprintSearchUrl(member) {
+  const sprintIds = member.currentSprint?.sprintIds || [];
+  const assigneeClause = `assignee = ${jqlQuote(member.member)}`;
+  const sprintClause = sprintIds.length
+    ? `AND sprint in (${sprintIds.map((id) => Number(id)).filter(Number.isFinite).join(", ")})`
+    : "";
+  return jiraSearchUrl(`${assigneeClause} ${sprintClause} AND statusCategory != "Done" ORDER BY updated DESC`.trim());
+}
+
 function supportFilterUrl(filterId = "18377") {
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?filter=${encodeURIComponent(filterId)}`;
 }
 
 function supportSearchUrl(payload, suffix = "ORDER BY priority DESC, updated ASC") {
   const filterId = payload.filterId || "18377";
-  return jiraSearchUrl(`filter = ${filterId} ${suffix}`.trim());
+  return jiraSearchUrl(`filter = ${filterId} AND statusCategory != "Done" ${suffix}`.trim());
 }
 
 function supportAssigneeSearchUrl(payload, assignee) {
@@ -883,7 +921,7 @@ function teamIssueSearchUrl(members, suffix = "ORDER BY updated DESC") {
   const assigneeClause = assignees.length
     ? `assignee in (${assignees.map((member) => `"${member.replace(/"/g, "\\\"")}"`).join(", ")})`
     : "assignee is not EMPTY";
-  const jql = `${assigneeClause} ${suffix}`.trim();
+  const jql = `${assigneeClause} AND statusCategory != "Done" ${suffix}`.trim();
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?jql=${encodeURIComponent(jql)}`;
 }
 
