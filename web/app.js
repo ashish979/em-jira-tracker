@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-support-actions-v1";
+const CACHE_VERSION = "2026-07-06-no-resolution-filter-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -820,7 +820,7 @@ function jiraSearchUrl(jql) {
 function sprintSearchUrl(board, suffix = "ORDER BY updated DESC") {
   const sprintId = board.sprint?.id;
   const base = sprintId ? `sprint = ${sprintId}` : `project is not EMPTY`;
-  return jiraSearchUrl(`${base} AND resolution = EMPTY ${suffix}`.trim());
+  return jiraSearchUrl(`${base} ${suffix}`.trim());
 }
 
 function sprintAssigneeSearchUrl(board, assignee) {
@@ -878,7 +878,7 @@ function teamIssueSearchUrl(members, suffix = "ORDER BY updated DESC") {
   const assigneeClause = assignees.length
     ? `assignee in (${assignees.map((member) => `"${member.replace(/"/g, "\\\"")}"`).join(", ")})`
     : "assignee is not EMPTY";
-  const jql = `${assigneeClause} AND resolution = EMPTY ${suffix}`.trim();
+  const jql = `${assigneeClause} ${suffix}`.trim();
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?jql=${encodeURIComponent(jql)}`;
 }
 

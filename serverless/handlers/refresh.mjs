@@ -52,9 +52,9 @@ async function refreshPayload(section, body, config) {
   if (section === "overview") {
     const emJqlField = toJqlField(emField);
     const [assigned, emOwned] = await Promise.all([
-      jira.searchIssues({ jql: "assignee = currentUser() AND resolution = EMPTY ORDER BY updated DESC", fields }),
+      jira.searchIssues({ jql: "assignee = currentUser() ORDER BY updated DESC", fields }),
       emField
-        ? jira.searchIssues({ jql: `${emJqlField} = currentUser() AND resolution = EMPTY ORDER BY updated DESC`, fields })
+        ? jira.searchIssues({ jql: `${emJqlField} = currentUser() ORDER BY updated DESC`, fields })
         : Promise.resolve({ issues: [] }),
     ]);
     const myIssues = assigned.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
@@ -73,7 +73,7 @@ async function refreshPayload(section, body, config) {
 
   if (section === "attention") {
     const result = await jira.searchIssues({
-      jql: "resolution = EMPTY AND (assignee = currentUser() OR updated >= -30d) ORDER BY duedate ASC, updated ASC",
+      jql: "(assignee = currentUser() OR updated >= -30d) ORDER BY duedate ASC, updated ASC",
       fields,
       maxResults: 100,
     });
@@ -113,7 +113,7 @@ async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl)
   const jqlMember = member.includes("@") ? `"${member}"` : member;
   const [activeResult, recentResult, boardWork] = await Promise.all([
     jira.searchIssues({
-      jql: `assignee = ${jqlMember} AND resolution = EMPTY ORDER BY updated ASC`,
+      jql: `assignee = ${jqlMember} ORDER BY updated ASC`,
       fields,
       maxResults: 100,
       limit: 500,
