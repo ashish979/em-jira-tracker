@@ -12,11 +12,13 @@ const [board, sprints, assigned, emOwned] = await Promise.all([
     jql: "assignee = currentUser() AND resolution = EMPTY ORDER BY updated DESC",
     fields: ["summary", "status", "assignee", config.jira.emField],
     maxResults: 5,
+    limit: 5,
   }),
   jira.searchIssues({
     jql: "cf[10067] = currentUser() AND resolution = EMPTY ORDER BY updated DESC",
     fields: ["summary", "status", "assignee", config.jira.emField],
     maxResults: 5,
+    limit: 5,
   }),
 ]);
 

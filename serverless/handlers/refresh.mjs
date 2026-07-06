@@ -4,11 +4,14 @@ import { createJiraClient, normalizeIssue } from "../jiraClient.mjs";
 const baseFields = [
   "summary",
   "status",
+  "issuetype",
+  "project",
   "priority",
   "assignee",
   "duedate",
   "updated",
   "statuscategorychangedate",
+  "created",
   "labels",
 ];
 
@@ -41,6 +44,7 @@ async function refreshPayload(section, body, config) {
   const jira = createJiraClient(config.jira);
   const emField = body?.settings?.emField || config.jira.emField;
   const fields = emField ? [...baseFields, emField] : baseFields;
+  const siteUrl = config.jira.siteUrl;
 
   if (section === "overview") {
     const emJqlField = toJqlField(emField);
@@ -50,8 +54,8 @@ async function refreshPayload(section, body, config) {
         ? jira.searchIssues({ jql: `${emJqlField} = currentUser() AND resolution = EMPTY ORDER BY updated DESC`, fields })
         : Promise.resolve({ issues: [] }),
     ]);
-    const myIssues = assigned.issues.map((item) => normalizeIssue(item, emField));
-    const emIssues = emOwned.issues.map((item) => normalizeIssue(item, emField));
+    const myIssues = assigned.issues.map((item) => normalizeIssue(item, emField, siteUrl));
+    const emIssues = emOwned.issues.map((item) => normalizeIssue(item, emField, siteUrl));
     return {
       metrics: [
         ["Assigned", myIssues.length, "from Jira"],
@@ -70,17 +74,18 @@ async function refreshPayload(section, body, config) {
       fields,
       maxResults: 100,
     });
-    return result.issues.map((item) => normalizeIssue(item, emField)).map(addAttentionReasons).filter((item) => item.reasons.length);
+    return result.issues.map((item) => normalizeIssue(item, emField, siteUrl)).map(addAttentionReasons).filter((item) => item.reasons.length);
   }
 
   if (section === "team") {
     const members = parseLines(body?.settings?.teamMembers || "");
-    return Promise.all(members.map((member) => loadMemberSummary(jira, member, fields, emField)));
+    const boards = parseTracked(body?.settings?.trackedItems || "", "board");
+    return Promise.all(members.map((member) => loadMemberSummary(jira, member, fields, emField, boards, siteUrl)));
   }
 
   if (section === "boards") {
     const boards = parseTracked(body?.settings?.trackedItems || "", "board");
-    return Promise.all(boards.map((board) => loadBoardSummary(jira, board)));
+    return Promise.all(boards.map((board) => loadBoardSummary(jira, board, fields, emField, siteUrl)));
   }
 
   if (section === "trackers") {
@@ -91,32 +96,63 @@ async function refreshPayload(section, body, config) {
   return {};
 }
 
-async function loadMemberSummary(jira, member, fields, emField) {
+async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl) {
   const jqlMember = member.includes("@") ? `"${member}"` : member;
-  const result = await jira.searchIssues({
-    jql: `assignee = ${jqlMember} AND resolution = EMPTY ORDER BY updated ASC`,
-    fields,
-    maxResults: 100,
-  });
-  const issues = result.issues.map((item) => normalizeIssue(item, emField));
-  const oldest = issues.reduce((max, item) => Math.max(max, ageDays(item.statusCategoryChangedDate || item.updated)), 0);
+  const [activeResult, recentResult, boardWork] = await Promise.all([
+    jira.searchIssues({
+      jql: `assignee = ${jqlMember} AND resolution = EMPTY ORDER BY updated ASC`,
+      fields,
+      maxResults: 100,
+      limit: 500,
+    }),
+    jira.searchIssues({
+      jql: `assignee = ${jqlMember} AND updated >= -45d ORDER BY updated DESC`,
+      fields,
+      maxResults: 100,
+      limit: 300,
+    }),
+    Promise.all(boards.map((board) => loadMemberBoardWork(jira, board, jqlMember, fields, emField, siteUrl))),
+  ]);
+  const activeIssues = activeResult.issues.map((item) => normalizeIssue(item, emField, siteUrl));
+  const recentIssues = recentResult.issues.map((item) => normalizeIssue(item, emField, siteUrl));
+  const oldest = activeIssues.reduce((max, item) => Math.max(max, item.ageDays || 0), 0);
   return {
     member,
-    active: issues.length,
-    inProgress: issues.filter((item) => item.status.toLowerCase().includes("progress")).length,
+    active: activeIssues.length,
+    inProgress: activeIssues.filter((item) => item.status.toLowerCase().includes("progress")).length,
     oldest,
-    attention: oldest > 8 ? "stale focus item" : issues.length > 5 ? "capacity check" : "healthy",
+    attention: oldest > 8 ? "stale focus item" : activeIssues.length > 5 ? "capacity check" : "healthy",
+    tickets: activeIssues.slice(0, 8),
+    recentTickets: recentIssues.slice(0, 8),
+    boards: boardWork.filter((board) => board.active || board.workedOn),
   };
 }
 
-async function loadBoardSummary(jira, board) {
+async function loadMemberBoardWork(jira, board, jqlMember, fields, emField, siteUrl) {
+  const result = await jira.getBoardIssues(board.id, {
+    fields,
+    jql: `assignee = ${jqlMember} AND updated >= -45d ORDER BY updated DESC`,
+    limit: 300,
+  });
+  const tickets = (result.issues || []).map((item) => normalizeIssue(item, emField, siteUrl));
+  return {
+    id: board.id,
+    name: board.name || `Board ${board.id}`,
+    active: tickets.filter((item) => !item.status.toLowerCase().includes("done")).length,
+    workedOn: tickets.length,
+    tickets: tickets.slice(0, 8),
+  };
+}
+
+async function loadBoardSummary(jira, board, fields, emField, siteUrl) {
   const [boardDetails, sprints, issues, backlog] = await Promise.all([
     jira.getBoard(board.id),
     jira.getActiveSprints(board.id),
-    jira.getBoardIssues(board.id),
-    jira.getBacklog(board.id),
+    jira.getBoardIssues(board.id, { fields, limit: 1000 }),
+    jira.getBacklog(board.id, { fields, limit: 1000 }),
   ]);
   const active = issues.issues || [];
+  const normalized = active.map((issue) => normalizeIssue(issue, emField, siteUrl));
   return {
     id: board.id,
     name: board.name || boardDetails.name,
@@ -125,6 +161,7 @@ async function loadBoardSummary(jira, board) {
     done: active.filter((issue) => issue.fields?.status?.statusCategory?.key === "done").length,
     backlog: backlog.issues?.length || 0,
     blocked: active.filter((issue) => (issue.fields?.labels || []).includes("blocked")).length,
+    tickets: normalized.slice(0, 12),
   };
 }
 
@@ -132,7 +169,8 @@ async function loadFilterSummary(jira, filter, fields) {
   const result = await jira.searchIssues({
     jql: `filter = ${filter.id}`,
     fields,
-    maxResults: 1,
+    maxResults: 100,
+    limit: 1,
   });
   return {
     type: "filter",
@@ -168,7 +206,7 @@ function parseTracked(value, type) {
 
 function addAttentionReasons(item) {
   const dueIn = item.due ? daysUntil(item.due) : null;
-  const staleAge = ageDays(item.statusCategoryChangedDate || item.updated);
+  const staleAge = item.ageDays ?? ageDays(item.statusCategoryChangedDate || item.updated);
   const reasons = [];
   if (dueIn !== null && dueIn < 0) reasons.push(`${Math.abs(dueIn)}d overdue`);
   if (dueIn !== null && dueIn >= 0 && dueIn <= 3) reasons.push(`due in ${dueIn}d`);

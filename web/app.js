@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-josys-live";
+const CACHE_VERSION = "2026-07-06-team-links-v2";
 const sections = ["overview", "attention", "team", "boards", "trackers"];
 
 const defaultSettings = {
@@ -52,7 +52,7 @@ const seed = {
 function issue(key, summary, status, priority, em, assignee, dueInDays, ageDays, labels) {
   const due = new Date();
   due.setDate(due.getDate() + dueInDays);
-  return { key, summary, status, priority, em, assignee, due: due.toISOString(), ageDays, labels };
+  return { key, summary, status, priority, em, assignee, due: due.toISOString(), ageDays, labels, url: `https://josysglobal.atlassian.net/browse/${key}` };
 }
 
 function loadSettings() {
@@ -154,12 +154,24 @@ function buildTeam(members) {
     const active = 3 + index * 2;
     const inProgress = Math.max(1, active - 2);
     const oldest = 4 + index * 3;
+    const tickets = seed.issues.slice(index % 3, index % 3 + 3);
     return {
       member,
       active,
       inProgress,
       oldest,
       attention: oldest > 8 ? "stale focus item" : active > 5 ? "capacity check" : "healthy",
+      tickets,
+      recentTickets: tickets,
+      boards: [
+        {
+          id: "141",
+          name: "User Profiles/Identities",
+          active: Math.max(1, inProgress - 1),
+          workedOn: tickets.length,
+          tickets,
+        },
+      ],
     };
   });
 }
@@ -217,7 +229,7 @@ function renderAttention(cache) {
     <article class="attention-row ${item.severity === "critical" ? "critical" : ""}">
       <div class="attention-top">
         <div>
-          <span class="key">${escapeHtml(item.key)}</span>
+          ${renderIssueLink(item, "key")}
           <p class="summary">${escapeHtml(item.summary)}</p>
         </div>
         <span class="tag ${item.severity === "critical" ? "hot" : "warn"}">${escapeHtml(item.severity)}</span>
@@ -229,15 +241,7 @@ function renderAttention(cache) {
 
 function renderTeam(cache) {
   setMeta("team", cache);
-  document.getElementById("team-table").innerHTML = cache.payload.map((member) => `
-    <tr>
-      <td>${escapeHtml(member.member)}</td>
-      <td>${member.active}</td>
-      <td>${member.inProgress}</td>
-      <td>${member.oldest}d</td>
-      <td>${escapeHtml(member.attention)}</td>
-    </tr>
-  `).join("");
+  document.getElementById("team-list").innerHTML = cache.payload.map(renderTeamMember).join("");
 }
 
 function renderBoards(cache) {
@@ -258,6 +262,7 @@ function renderBoards(cache) {
           <span class="tag">${board.active} active</span>
           <span class="tag">${board.backlog} backlog</span>
         </div>
+        ${board.tickets?.length ? `<div class="mini-ticket-list">${board.tickets.slice(0, 6).map(renderMiniIssue).join("")}</div>` : ""}
         <div class="progress-bar"><div class="progress-fill" style="width: ${Math.min(100, progress)}%"></div></div>
       </article>
     `;
@@ -288,19 +293,73 @@ function renderIssue(item) {
     <article class="issue-row">
       <div class="issue-top">
         <div>
-          <span class="key">${escapeHtml(item.key)}</span>
-          <p class="summary">${escapeHtml(item.summary)}</p>
+          ${renderIssueLink(item, "key")}
+          <p class="summary">${renderIssueLink(item, "summary")}</p>
         </div>
-        <span class="tag ${item.priority === "High" ? "hot" : ""}">${escapeHtml(item.priority)}</span>
+        <span class="tag ${item.priority === "High" ? "hot" : ""}">${escapeHtml(item.priority || "None")}</span>
       </div>
       <div class="tag-row">
-        <span class="tag">${escapeHtml(item.status)}</span>
-        <span class="tag">${escapeHtml(item.assignee)}</span>
-        <span class="tag">age ${item.ageDays}d</span>
-        <span class="tag">due ${daysUntil(item.due)}d</span>
+        <span class="tag">${escapeHtml(item.status || "Unknown")}</span>
+        <span class="tag">${escapeHtml(item.assignee || "Unassigned")}</span>
+        <span class="tag">${formatAge(item)}</span>
+        <span class="tag">${formatDue(item.due)}</span>
       </div>
     </article>
   `;
+}
+
+function renderTeamMember(member) {
+  const tickets = member.tickets?.length ? member.tickets : member.recentTickets || [];
+  const boards = member.boards || [];
+  return `
+    <article class="team-card">
+      <div class="team-card-head">
+        <div>
+          <h4>${escapeHtml(member.member)}</h4>
+          <p>${escapeHtml(member.attention || "healthy")}</p>
+        </div>
+        <span class="tag ${member.attention === "healthy" ? "" : "warn"}">${member.active || 0} active</span>
+      </div>
+      <div class="team-metrics">
+        <span><strong>${member.inProgress || 0}</strong> in progress</span>
+        <span><strong>${Number.isFinite(member.oldest) ? member.oldest : 0}d</strong> oldest</span>
+        <span><strong>${boards.length}</strong> boards</span>
+      </div>
+      ${boards.length ? `
+        <div class="team-subsection">
+          <h5>Boards</h5>
+          ${boards.map((board) => `
+            <div class="board-work">
+              <div>
+                <span class="key">board ${escapeHtml(board.id)}</span>
+                <strong>${escapeHtml(board.name)}</strong>
+              </div>
+              <span>${board.active || 0} active / ${board.workedOn || 0} worked</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      <div class="team-subsection">
+        <h5>Tickets</h5>
+        <div class="mini-ticket-list">${tickets.length ? tickets.slice(0, 8).map(renderMiniIssue).join("") : `<span class="empty-state">No matching tickets in cache</span>`}</div>
+      </div>
+    </article>
+  `;
+}
+
+function renderMiniIssue(item) {
+  return `
+    <a class="mini-ticket" href="${escapeAttribute(issueHref(item))}" target="_blank" rel="noopener noreferrer">
+      <span>${escapeHtml(item.key)}</span>
+      <strong>${escapeHtml(item.summary || "Untitled issue")}</strong>
+      <em>${escapeHtml(item.status || "Unknown")} · ${formatAge(item)}</em>
+    </a>
+  `;
+}
+
+function renderIssueLink(item, className) {
+  const text = className === "summary" ? item.summary || "Untitled issue" : item.key;
+  return `<a class="${className}" href="${escapeAttribute(issueHref(item))}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
 }
 
 function setMeta(section, cache) {
@@ -326,7 +385,29 @@ function parseLines(value) {
 }
 
 function daysUntil(isoDate) {
+  if (!isoDate) return null;
   return Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86400000);
+}
+
+function formatAge(item) {
+  const age = Number.isFinite(item.ageDays)
+    ? item.ageDays
+    : item.statusCategoryChangedDate || item.updated
+      ? Math.max(0, Math.floor((Date.now() - new Date(item.statusCategoryChangedDate || item.updated).getTime()) / 86400000))
+      : null;
+  return age === null ? "age unknown" : `age ${age}d`;
+}
+
+function formatDue(isoDate) {
+  const dueIn = daysUntil(isoDate);
+  if (dueIn === null) return "no due date";
+  if (dueIn === 0) return "due today";
+  return dueIn > 0 ? `due in ${dueIn}d` : `${Math.abs(dueIn)}d overdue`;
+}
+
+function issueHref(item) {
+  if (item.url) return item.url;
+  return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/${item.key}`;
 }
 
 function wait(ms) {
@@ -341,6 +422,10 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#039;",
   })[char]);
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/`/g, "&#096;");
 }
 
 function setGlobalCacheState(state) {

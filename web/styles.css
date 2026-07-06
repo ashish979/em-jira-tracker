@@ -1,16 +1,16 @@
 :root {
-  --bg: #eef2ec;
-  --panel: #fbfcf7;
-  --panel-2: #f2f6ee;
-  --line: #9aa791;
-  --line-soft: #c9d2c1;
-  --text: #20271f;
-  --muted: #62705b;
-  --green: #247a35;
-  --amber: #9a6800;
-  --red: #b4232b;
-  --blue: #1c5f91;
-  --shadow: rgba(47, 62, 43, 0.14);
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --line: #d8dee8;
+  --line-soft: #e7ebf1;
+  --text: #172033;
+  --muted: #64748b;
+  --green: #138a72;
+  --amber: #b7791f;
+  --red: #c2414b;
+  --blue: #2563eb;
+  --shadow: rgba(15, 23, 42, 0.08);
 }
 
 * {
@@ -23,11 +23,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    linear-gradient(rgba(33, 47, 30, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(33, 47, 30, 0.04) 1px, transparent 1px),
-    var(--bg);
-  background-size: 18px 18px;
+  background: var(--bg);
   color: var(--text);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
@@ -55,7 +51,7 @@ button {
   top: 0;
   height: 100vh;
   border-right: 1px solid var(--line);
-  background: rgba(247, 250, 243, 0.96);
+  background: #ffffff;
   padding: 22px;
   display: flex;
   flex-direction: column;
@@ -74,12 +70,13 @@ button {
   place-items: center;
   width: 48px;
   height: 48px;
-  border: 1px solid var(--green);
-  color: var(--green);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  font-family: inherit;
   font-weight: 800;
-  background: #f8fbf4;
-  box-shadow: 0 0 24px rgba(36, 122, 53, 0.12);
+  background: linear-gradient(135deg, var(--blue), #0f766e);
+  box-shadow: 0 14px 26px rgba(37, 99, 235, 0.18);
 }
 
 .brand h1,
@@ -96,10 +93,11 @@ button {
 
 .eyebrow {
   margin: 0 0 3px;
-  color: var(--green);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--blue);
+  font-family: inherit;
   font-size: 11px;
-  letter-spacing: 0;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -112,24 +110,27 @@ button {
   color: var(--muted);
   text-decoration: none;
   border: 1px solid transparent;
+  border-radius: 8px;
   padding: 10px 12px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 13px;
+  font-weight: 700;
 }
 
 .nav-list a:hover {
   color: var(--text);
-  border-color: var(--line);
-  background: var(--panel);
+  border-color: #dbeafe;
+  background: #eff6ff;
 }
 
 .terminal-note {
   margin-top: auto;
   border: 1px solid var(--line);
-  background: #f7faf3;
+  border-radius: 8px;
+  background: var(--panel-2);
   color: var(--muted);
   padding: 12px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -157,7 +158,8 @@ button {
 .topbar {
   min-height: 76px;
   border: 1px solid var(--line);
-  background: rgba(251, 252, 247, 0.96);
+  border-radius: 10px;
+  background: var(--panel);
   padding: 18px 20px;
   box-shadow: 0 16px 36px var(--shadow);
   min-width: 0;
@@ -175,34 +177,38 @@ button {
 .icon-button,
 .command-button {
   border: 1px solid var(--line);
-  background: #f7faf3;
-  color: var(--text);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--blue);
   min-height: 38px;
+  font-weight: 800;
 }
 
 .icon-button {
   width: 40px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-weight: 800;
 }
 
 .command-button {
   padding: 8px 14px;
-  color: var(--green);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 13px;
 }
 
 .icon-button:hover,
 .command-button:hover {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(36, 122, 53, 0.12);
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .section-band,
 .panel {
   border: 1px solid var(--line);
-  background: rgba(251, 252, 247, 0.94);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 26px var(--shadow);
 }
 
 .section-band {
@@ -219,7 +225,7 @@ button {
   min-height: 24px;
   margin: 10px 0 14px;
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -232,6 +238,7 @@ button {
 
 .metric {
   border: 1px solid var(--line-soft);
+  border-radius: 8px;
   background: var(--panel-2);
   padding: 13px;
   min-height: 94px;
@@ -239,7 +246,7 @@ button {
 
 .metric span {
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -284,15 +291,20 @@ button {
 .tracker-grid {
   display: grid;
   gap: 9px;
+  min-width: 0;
 }
 
 .issue-row,
 .attention-row,
 .board-card,
-.tracker-card {
+.tracker-card,
+.team-card {
   border: 1px solid var(--line-soft);
-  background: #f8faf4;
+  border-radius: 8px;
+  background: #ffffff;
   padding: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .issue-top,
@@ -303,31 +315,54 @@ button {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+  min-width: 0;
+}
+
+.issue-top > div,
+.attention-top > div,
+.board-top > div,
+.tracker-top > div {
+  min-width: 0;
 }
 
 .key {
   color: var(--blue);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+a.key:hover,
+a.summary:hover,
+.mini-ticket:hover strong {
+  color: var(--blue);
+  text-decoration: underline;
 }
 
 .summary {
   margin: 3px 0 8px;
   font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .tag-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .tag {
   border: 1px solid var(--line);
+  border-radius: 999px;
   color: var(--muted);
   padding: 2px 6px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 11px;
+  font-weight: 700;
 }
 
 .tag.hot {
@@ -373,9 +408,9 @@ td {
 }
 
 th {
-  color: var(--green);
-  background: #edf5e8;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--blue);
+  background: #f8fafc;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -391,13 +426,15 @@ td {
 .progress-bar {
   height: 8px;
   border: 1px solid var(--line);
-  background: #e6ecdf;
+  border-radius: 999px;
+  background: #eef2f7;
   margin-top: 10px;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--green), var(--amber));
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue), var(--green));
 }
 
 .settings-grid {
@@ -410,7 +447,7 @@ label {
   display: grid;
   gap: 7px;
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
 }
 
@@ -422,6 +459,7 @@ input,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
+  border-radius: 8px;
   background: #ffffff;
   color: var(--text);
   padding: 10px;
@@ -431,14 +469,138 @@ textarea {
 input:focus,
 textarea:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(36, 122, 53, 0.12);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .settings-note {
   margin: 12px 0 0;
   color: var(--amber);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: inherit;
   font-size: 12px;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-card {
+  display: grid;
+  gap: 12px;
+}
+
+.team-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-card h4,
+.team-card p,
+.team-card h5 {
+  margin: 0;
+}
+
+.team-card h4 {
+  font-size: 15px;
+}
+
+.team-card p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.team-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-metrics span {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  padding: 9px;
+  font-size: 12px;
+}
+
+.team-metrics strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.team-subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.team-subsection h5 {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.board-work {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px;
+  font-size: 12px;
+}
+
+.board-work strong {
+  display: block;
+  margin-top: 2px;
+}
+
+.mini-ticket-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.mini-ticket {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.mini-ticket span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mini-ticket strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.mini-ticket em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 @media (max-width: 980px) {
@@ -459,6 +621,7 @@ textarea:focus {
   .split-grid,
   .board-grid,
   .tracker-grid,
+  .team-grid,
   .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -478,6 +641,21 @@ textarea:focus {
   .board-top,
   .tracker-top {
     align-items: stretch;
+    flex-direction: column;
+  }
+
+  .issue-top,
+  .attention-top,
+  .board-top,
+  .tracker-top {
+    align-items: flex-start;
+  }
+
+  .team-card-head,
+  .board-work,
+  .mini-ticket {
+    align-items: stretch;
+    grid-template-columns: 1fr;
     flex-direction: column;
   }
 

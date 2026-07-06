@@ -25,15 +25,39 @@ export function createJiraClient({ siteUrl, email, apiToken }) {
     return response.json();
   }
 
-  async function searchIssues({ jql, fields = [], maxResults = 50 }) {
-    return request("/rest/api/3/search/jql", {
-      method: "POST",
-      body: JSON.stringify({
-        jql,
-        maxResults,
-        fields,
-      }),
-    });
+  async function searchIssues({ jql, fields = [], maxResults = 100, limit = 1000 }) {
+    const issues = [];
+    let nextPageToken;
+    let total;
+    let lastResult = {};
+
+    while (issues.length < limit) {
+      const result = await request("/rest/api/3/search/jql", {
+        method: "POST",
+        body: JSON.stringify({
+          jql,
+          fields,
+          maxResults: Math.min(maxResults, limit - issues.length),
+          ...(nextPageToken ? { nextPageToken } : {}),
+        }),
+      });
+
+      lastResult = result;
+      issues.push(...(result.issues || []));
+      total = typeof result.total === "number" ? result.total : total;
+      nextPageToken = result.nextPageToken;
+
+      if (nextPageToken) continue;
+      break;
+    }
+
+    return {
+      ...lastResult,
+      issues,
+      total: total ?? issues.length,
+      returned: issues.length,
+      truncated: issues.length >= limit && (typeof total !== "number" || issues.length < total),
+    };
   }
 
   async function getFields() {
@@ -48,12 +72,58 @@ export function createJiraClient({ siteUrl, email, apiToken }) {
     return request(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/sprint?state=active`);
   }
 
-  async function getBoardIssues(boardId) {
-    return request(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/issue?maxResults=100`);
+  async function getBoardIssues(boardId, { fields = [], jql = "", limit = 1000 } = {}) {
+    const params = new URLSearchParams({ maxResults: "100" });
+    if (jql) params.set("jql", jql);
+    for (const field of fields) params.append("fields", field);
+    return pagedAgile(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/issue`, params, "issues", limit);
   }
 
-  async function getBacklog(boardId) {
-    return request(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/backlog?maxResults=100`);
+  async function getBacklog(boardId, { fields = [], limit = 1000 } = {}) {
+    const params = new URLSearchParams({ maxResults: "100" });
+    for (const field of fields) params.append("fields", field);
+    return pagedAgile(`/rest/agile/1.0/board/${encodeURIComponent(boardId)}/backlog`, params, "issues", limit);
+  }
+
+  async function pagedAgile(path, params, itemKey, limit) {
+    const items = [];
+    let nextPageToken;
+    let startAt = 0;
+    let total;
+    let lastResult = {};
+
+    while (items.length < limit) {
+      const pageParams = new URLSearchParams(params);
+      pageParams.set("maxResults", String(Math.min(Number(pageParams.get("maxResults") || 100), limit - items.length)));
+      if (nextPageToken) pageParams.set("nextPageToken", nextPageToken);
+      else pageParams.set("startAt", String(startAt));
+
+      const result = await request(`${path}?${pageParams.toString()}`);
+      const pageItems = result[itemKey] || result.values || [];
+      lastResult = result;
+      items.push(...pageItems);
+      total = typeof result.total === "number" ? result.total : total;
+      nextPageToken = result.nextPageToken;
+
+      if (nextPageToken) continue;
+      if (result.isLast === false && pageItems.length) {
+        startAt += pageItems.length;
+        continue;
+      }
+      if (typeof total === "number" && items.length < total && pageItems.length) {
+        startAt += pageItems.length;
+        continue;
+      }
+      break;
+    }
+
+    return {
+      ...lastResult,
+      [itemKey]: items,
+      total: total ?? items.length,
+      returned: items.length,
+      truncated: items.length >= limit && (typeof total !== "number" || items.length < total),
+    };
   }
 
   return {
@@ -66,12 +136,14 @@ export function createJiraClient({ siteUrl, email, apiToken }) {
   };
 }
 
-export function normalizeIssue(issue, emField) {
+export function normalizeIssue(issue, emField, siteUrl = "") {
   const fields = issue.fields || {};
   const assignee = fields.assignee || {};
   const status = fields.status || {};
   const priority = fields.priority || {};
   const em = emField ? fields[emField] : null;
+
+  const statusChangedAt = fields.statuscategorychangedate || fields.statusCategoryChangedDate || null;
 
   return {
     key: issue.key,
@@ -82,8 +154,14 @@ export function normalizeIssue(issue, emField) {
     em: em?.displayName || em?.emailAddress || em?.value || null,
     due: fields.duedate || null,
     updated: fields.updated || null,
-    statusCategoryChangedDate: fields.statuscategorychangedate || null,
+    statusCategoryChangedDate: statusChangedAt,
+    ageDays: ageDays(statusChangedAt || fields.updated || issue.created),
     labels: fields.labels || [],
-    url: issue.self || null,
+    url: siteUrl ? `${siteUrl.replace(/\/$/, "")}/browse/${issue.key}` : issue.self || null,
   };
+}
+
+function ageDays(isoDate) {
+  if (!isoDate) return null;
+  return Math.max(0, Math.floor((Date.now() - new Date(isoDate).getTime()) / 86400000));
 }
