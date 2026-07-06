@@ -54,8 +54,8 @@ async function refreshPayload(section, body, config) {
         ? jira.searchIssues({ jql: `${emJqlField} = currentUser() AND resolution = EMPTY ORDER BY updated DESC`, fields })
         : Promise.resolve({ issues: [] }),
     ]);
-    const myIssues = assigned.issues.map((item) => normalizeIssue(item, emField, siteUrl));
-    const emIssues = emOwned.issues.map((item) => normalizeIssue(item, emField, siteUrl));
+    const myIssues = assigned.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
+    const emIssues = emOwned.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
     return {
       metrics: [
         ["Assigned", myIssues.length, "from Jira"],
@@ -74,7 +74,7 @@ async function refreshPayload(section, body, config) {
       fields,
       maxResults: 100,
     });
-    return result.issues.map((item) => normalizeIssue(item, emField, siteUrl)).map(addAttentionReasons).filter((item) => item.reasons.length);
+    return result.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone).map(addAttentionReasons).filter((item) => item.reasons.length);
   }
 
   if (section === "team") {
@@ -123,8 +123,8 @@ async function loadMemberSummary(jira, member, fields, emField, boards, siteUrl)
     }),
     Promise.all(boards.map((board) => loadMemberBoardWork(jira, board, jqlMember, fields, emField, siteUrl))),
   ]);
-  const activeIssues = activeResult.issues.map((item) => normalizeIssue(item, emField, siteUrl));
-  const recentIssues = recentResult.issues.map((item) => normalizeIssue(item, emField, siteUrl));
+  const activeIssues = activeResult.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
+  const recentIssues = recentResult.issues.map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
   const oldest = activeIssues.reduce((max, item) => Math.max(max, item.ageDays || 0), 0);
   return {
     member,
@@ -144,7 +144,7 @@ async function loadMemberBoardWork(jira, board, jqlMember, fields, emField, site
     jql: `assignee = ${jqlMember} AND updated >= -45d ORDER BY updated DESC`,
     limit: 300,
   });
-  const tickets = (result.issues || []).map((item) => normalizeIssue(item, emField, siteUrl));
+  const tickets = (result.issues || []).map((item) => normalizeIssue(item, emField, siteUrl)).filter(isNotDone);
   return {
     id: board.id,
     name: board.name || `Board ${board.id}`,
@@ -162,15 +162,15 @@ async function loadBoardSummary(jira, board, fields, emField, siteUrl) {
     jira.getBacklog(board.id, { fields, limit: 1000 }),
   ]);
   const active = issues.issues || [];
-  const normalized = active.map((issue) => normalizeIssue(issue, emField, siteUrl));
+  const normalized = active.map((issue) => normalizeIssue(issue, emField, siteUrl)).filter(isNotDone);
   return {
     id: board.id,
     name: board.name || boardDetails.name,
     sprint: sprints.values?.[0]?.name || "No active sprint",
-    active: active.length,
-    done: active.filter((issue) => issue.fields?.status?.statusCategory?.key === "done").length,
+    active: normalized.length,
+    done: 0,
     backlog: backlog.issues?.length || 0,
-    blocked: active.filter((issue) => (issue.fields?.labels || []).includes("blocked")).length,
+    blocked: normalized.filter((issue) => issue.labels.includes("blocked")).length,
     tickets: normalized.slice(0, 12),
   };
 }
@@ -185,7 +185,7 @@ async function loadSprintSummary(jira, board, fields, emField, members, siteUrl)
   const sprintIssues = sprint
     ? await jira.getSprintIssues(sprint.id, { fields, limit: 1000 })
     : { issues: [] };
-  const tickets = (sprintIssues.issues || []).map((issue) => normalizeIssue(issue, emField, siteUrl));
+  const tickets = (sprintIssues.issues || []).map((issue) => normalizeIssue(issue, emField, siteUrl)).filter(isNotDone);
   const assigneeCounts = groupCount(tickets, (ticket) => ticket.assignee || "Unassigned");
   const memberCoverage = members.map((member) => {
     const display = memberDisplay(member);
@@ -211,7 +211,7 @@ async function loadSprintSummary(jira, board, fields, emField, members, siteUrl)
       : null,
     totals: {
       tickets: tickets.length,
-      done: tickets.filter((ticket) => ticket.statusCategory === "done" || ticket.status.toLowerCase() === "done").length,
+      done: 0,
       inProgress: tickets.filter((ticket) => ticket.status.toLowerCase().includes("progress")).length,
       unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
       backlog: backlog.issues?.length || 0,
@@ -238,7 +238,7 @@ async function loadSupportAttention(jira, fields, emField, siteUrl, filterId) {
     maxResults: 100,
     limit: 1000,
   });
-  const tickets = result.issues.map((issue) => normalizeIssue(issue, emField, siteUrl)).map(addAttentionReasons);
+  const tickets = result.issues.map((issue) => normalizeIssue(issue, emField, siteUrl)).filter(isNotDone).map(addAttentionReasons);
   return {
     filterId,
     url: `${siteUrl.replace(/\/$/, "")}/issues/?filter=${filterId}`,
@@ -352,6 +352,10 @@ function countWithLabel(issues, label) {
 
 function countDueSoon(issues) {
   return new Set(issues.filter((issue) => issue.due && daysUntil(issue.due) <= 3).map((issue) => issue.key)).size;
+}
+
+function isNotDone(issue) {
+  return issue.statusCategory !== "done" && issue.status.toLowerCase() !== "done" && issue.status.toLowerCase() !== "closed" && issue.status.toLowerCase() !== "archived";
 }
 
 function toJqlField(fieldId) {

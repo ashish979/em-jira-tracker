@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-pages-sprint-support-v1";
+const CACHE_VERSION = "2026-07-06-hide-done-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
@@ -40,9 +40,9 @@ const seed = {
     issue("PLAT-2220", "Sprint planning capacity update", "Done", "Medium", "Ashish", "Ashish", 2, 1, ["planning"]),
   ],
   boards: [
-    { id: "141", name: "User Profiles/Identities", sprint: "SC-Sprint 8", active: 18, done: 9, backlog: 64, blocked: 2 },
-    { id: "77", name: "Developer experience", sprint: "Sprint 18", active: 11, done: 4, backlog: 31, blocked: 1 },
-    { id: "13", name: "Ops reliability", sprint: "Sprint 09", active: 7, done: 6, backlog: 18, blocked: 0 },
+    { id: "141", name: "User Profiles/Identities", sprint: "SC-Sprint 8", active: 18, done: 0, backlog: 64, blocked: 2 },
+    { id: "77", name: "Developer experience", sprint: "Sprint 18", active: 11, done: 0, backlog: 31, blocked: 1 },
+    { id: "13", name: "Ops reliability", sprint: "Sprint 09", active: 7, done: 0, backlog: 18, blocked: 0 },
   ],
   trackers: [
     { type: "filter", id: "181", name: "Release blockers", count: 5, previous: 7, url: "#" },
@@ -122,8 +122,8 @@ function buildMockPayload(section, settings) {
 }
 
 function buildOverview() {
-  const myIssues = seed.issues.filter((item) => item.assignee === "Ashish" || item.assignee === "Aisha");
-  const emIssues = seed.issues.filter((item) => item.em === "Ashish");
+  const myIssues = seed.issues.filter(isNotDone).filter((item) => item.assignee === "Ashish" || item.assignee === "Aisha");
+  const emIssues = seed.issues.filter(isNotDone).filter((item) => item.em === "Ashish");
   return {
     metrics: [
       ["Assigned", myIssues.length, "+2 since cache"],
@@ -138,6 +138,7 @@ function buildOverview() {
 
 function buildAttention() {
   return seed.issues
+    .filter(isNotDone)
     .map((item) => {
       const dueIn = daysUntil(item.due);
       const reasons = [];
@@ -157,7 +158,7 @@ function buildTeam(members) {
     const active = 3 + index * 2;
     const inProgress = Math.max(1, active - 2);
     const oldest = 4 + index * 3;
-    const tickets = seed.issues.slice(index % 3, index % 3 + 3);
+    const tickets = seed.issues.filter(isNotDone).slice(index % 3, index % 3 + 3);
     return {
       member,
       active,
@@ -185,14 +186,14 @@ function buildBoards(tracked) {
     .map((line) => {
       const [rawId, ...nameParts] = line.replace("board:", "").split(" ");
       const existing = seed.boards.find((board) => board.id === rawId);
-      return existing || { id: rawId, name: nameParts.join(" ") || `Board ${rawId}`, sprint: "Active sprint", active: 8, done: 3, backlog: 21, blocked: 0 };
+      return existing || { id: rawId, name: nameParts.join(" ") || `Board ${rawId}`, sprint: "Active sprint", active: 8, done: 0, backlog: 21, blocked: 0 };
     });
   return configuredBoards.length ? configuredBoards : seed.boards;
 }
 
 function buildSprint(tracked, members) {
   return buildBoards(tracked).map((board) => {
-    const tickets = seed.issues.map((item, index) => ({ ...item, assignee: members[index % Math.max(1, members.length)] || item.assignee }));
+    const tickets = seed.issues.filter(isNotDone).map((item, index) => ({ ...item, assignee: members[index % Math.max(1, members.length)] || item.assignee }));
     return {
       ...board,
       sprint: {
@@ -207,7 +208,7 @@ function buildSprint(tracked, members) {
       },
       totals: {
         tickets: tickets.length,
-        done: tickets.filter((ticket) => ticket.status === "Done").length,
+        done: 0,
         inProgress: tickets.filter((ticket) => ticket.status.includes("Progress")).length,
         unassigned: tickets.filter((ticket) => ticket.assignee === "Unassigned").length,
         backlog: board.backlog,
@@ -229,7 +230,7 @@ function buildSprint(tracked, members) {
 }
 
 function buildSupport() {
-  const tickets = seed.issues.map(addMockReasons);
+  const tickets = seed.issues.filter(isNotDone).map(addMockReasons);
   return {
     filterId: "18377",
     url: "https://josysglobal.atlassian.net/issues/?filter=18377",
@@ -286,18 +287,20 @@ function renderAll() {
 function renderOverview(cache) {
   setMeta("overview", cache);
   const payload = cache.payload;
+  const myIssues = (payload.myIssues || []).filter(isNotDone);
+  const emIssues = (payload.emIssues || []).filter(isNotDone);
   document.getElementById("overview-metrics").innerHTML = payload.metrics.map(([label, value, detail]) => `
-    <article class="metric"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(detail)}</small></article>
+    <article class="metric"><span>${escapeHtml(label)}</span><strong>${label === "Assigned" ? myIssues.length : label === "EM-owned" ? emIssues.length : value}</strong><small>${escapeHtml(detail)}</small></article>
   `).join("");
-  document.getElementById("my-ticket-count").textContent = `${payload.myIssues.length} issues`;
-  document.getElementById("em-ticket-count").textContent = `${payload.emIssues.length} issues`;
-  renderPaginatedList("my-issues", payload.myIssues, renderIssue);
-  renderPaginatedList("em-issues", payload.emIssues, renderIssue);
+  document.getElementById("my-ticket-count").textContent = `${myIssues.length} issues`;
+  document.getElementById("em-ticket-count").textContent = `${emIssues.length} issues`;
+  renderPaginatedList("my-issues", myIssues, renderIssue);
+  renderPaginatedList("em-issues", emIssues, renderIssue);
 }
 
 function renderAttention(cache) {
   setMeta("attention", cache);
-  renderPaginatedList("attention-list", cache.payload, (item) => `
+  renderPaginatedList("attention-list", cache.payload.filter(isNotDone), (item) => `
     <article class="attention-row ${item.severity === "critical" ? "critical" : ""}">
       <div class="attention-top">
         <div>
@@ -366,7 +369,8 @@ function renderSprintBoard(board) {
   if (!sprint) {
     return `<article class="panel"><h4>${escapeHtml(board.name)}</h4><p class="empty-state">No active sprint found.</p></article>`;
   }
-  const progress = Math.round(((board.totals?.done || 0) / Math.max(1, board.totals?.tickets || 0)) * 100);
+  const tickets = (board.tickets || []).filter(isNotDone);
+  const progress = 0;
   const endCopy = sprint.daysRemaining === null
     ? "No end date"
     : sprint.daysRemaining < 0
@@ -389,9 +393,9 @@ function renderSprintBoard(board) {
         <span class="sprint-date ${sprint.isPastEndDate ? "danger" : ""}">${escapeHtml(endCopy)}</span>
       </div>
       <div class="metric-grid compact">
-        ${renderMetric("Sprint tickets", board.totals?.tickets || 0, `${progress}% done`)}
+        ${renderMetric("Sprint tickets", tickets.length, "open only")}
         ${renderMetric("In progress", board.totals?.inProgress || 0, "active motion")}
-        ${renderMetric("Unassigned", board.totals?.unassigned || 0, "ownership gap")}
+        ${renderMetric("Unassigned", tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap")}
         ${renderMetric("Backlog", board.totals?.backlog || 0, "outside sprint")}
       </div>
       <div class="progress-bar large"><div class="progress-fill" style="width: ${Math.min(100, progress)}%"></div></div>
@@ -411,7 +415,7 @@ function renderSprintBoard(board) {
         </div>
       </div>
       <div class="panel">
-        <div class="panel-heading"><h4>Sprint tickets</h4><span>${board.tickets?.length || 0} issues</span></div>
+          <div class="panel-heading"><h4>Sprint tickets</h4><span>${tickets.length} open issues</span></div>
         <div id="${ticketListId}"></div>
       </div>
     </article>
@@ -421,7 +425,7 @@ function renderSprintBoard(board) {
 function renderBoards(cache) {
   setMeta("boards", cache);
   document.getElementById("board-grid").innerHTML = cache.payload.map((board) => {
-    const progress = Math.round((board.done / Math.max(1, board.active)) * 100);
+    const progress = 0;
     return `
       <article class="board-card">
         <div class="board-top">
@@ -445,7 +449,7 @@ function renderBoards(cache) {
 
 function renderSupport(cache) {
   setMeta("support", cache);
-  const payload = cache.payload;
+  const payload = { ...cache.payload, tickets: (cache.payload.tickets || []).filter(isNotDone) };
   document.getElementById("support-view").innerHTML = `
     <div class="support-header">
       <div>
@@ -455,10 +459,10 @@ function renderSupport(cache) {
       <a class="command-link" href="${escapeAttribute(payload.url || "https://josysglobal.atlassian.net/issues/?filter=18377")}" target="_blank" rel="noopener noreferrer">Open in Jira</a>
     </div>
     <div class="metric-grid compact">
-      ${renderMetric("Tickets", payload.totals?.tickets || 0, "in filter")}
-      ${renderMetric("Critical", payload.totals?.critical || 0, "needs attention")}
-      ${renderMetric("Stale", payload.totals?.stale || 0, "age signal")}
-      ${renderMetric("Unassigned", payload.totals?.unassigned || 0, "ownership gap")}
+      ${renderMetric("Tickets", payload.tickets.length, "open in filter")}
+      ${renderMetric("Critical", payload.tickets.filter((ticket) => ticket.severity === "critical").length, "needs attention")}
+      ${renderMetric("Stale", payload.tickets.filter((ticket) => ticket.reasons?.some((reason) => reason.includes("motion"))).length, "age signal")}
+      ${renderMetric("Unassigned", payload.tickets.filter((ticket) => ticket.assignee === "Unassigned").length, "ownership gap")}
     </div>
     <div class="ops-grid">
       ${renderGroupPanel("Status", payload.groups?.byStatus || [])}
@@ -537,7 +541,7 @@ function renderIssue(item) {
 }
 
 function renderTeamMember(member) {
-  const tickets = member.tickets?.length ? member.tickets : member.recentTickets || [];
+  const tickets = (member.tickets?.length ? member.tickets : member.recentTickets || []).filter(isNotDone);
   const boards = member.boards || [];
   return `
     <article class="team-card">
@@ -583,6 +587,11 @@ function renderMiniIssue(item) {
       <em>${escapeHtml(item.status || "Unknown")} · ${formatAge(item)}</em>
     </a>
   `;
+}
+
+function isNotDone(issue) {
+  const status = String(issue.status || "").toLowerCase();
+  return issue.statusCategory !== "done" && status !== "done" && status !== "closed" && status !== "archived";
 }
 
 function renderIssueLink(item, className) {
