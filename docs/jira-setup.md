@@ -25,7 +25,7 @@ Then edit `.env`:
 JIRA_SITE_URL=https://josysglobal.atlassian.net
 JIRA_EMAIL=ashish.agrawal@josys.com
 JIRA_API_TOKEN=your-token-here
-JIRA_EM_FIELD=
+JIRA_EM_FIELD=customfield_10067
 ```
 
 ## Find The EM Custom Field
@@ -37,8 +37,17 @@ npm run discover:fields
 ```
 
 Look for a row named `EM`, `Engineering Manager`, or your company's exact field
-label. The id will look like `customfield_12345`. Put that value in
-`JIRA_EM_FIELD`.
+label. For Josys, discovery found `Engineering Manager` as
+`customfield_10067`.
 
 If the list is too broad, we can also inspect one known issue from board 141 and
 match the rendered Jira field label to the REST field id.
+
+## Run With Live Jira Refresh
+
+```bash
+npm run dev:jira
+```
+
+Open `http://localhost:4174`. The browser still does not receive the API token;
+refresh requests go to the local Node server, which reads `.env` and calls Jira.

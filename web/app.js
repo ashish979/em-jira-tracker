@@ -1,10 +1,12 @@
 const CACHE_PREFIX = "jira-command-center:";
+const CACHE_VERSION = "2026-07-06-josys-live";
 const sections = ["overview", "attention", "team", "boards", "trackers"];
 
 const defaultSettings = {
+  settingsVersion: CACHE_VERSION,
   jiraSiteUrl: "https://josysglobal.atlassian.net",
   jiraEmail: "ashish.agrawal@josys.com",
-  emField: "",
+  emField: "customfield_10067",
   apiBaseUrl: "",
   teamMembers: [
     "amarnath.chowdary@josys.com",
@@ -23,7 +25,7 @@ const defaultSettings = {
     "swathi.kolamala@josys.com",
     "vikas.sahu@josys.com",
   ].join("\n"),
-  trackedItems: ["board:141 SC board"].join("\n"),
+  trackedItems: ["board:141 User Profiles/Identities"].join("\n"),
 };
 
 const seed = {
@@ -36,7 +38,7 @@ const seed = {
     issue("PLAT-2220", "Sprint planning capacity update", "Done", "Medium", "Ashish", "Ashish", 2, 1, ["planning"]),
   ],
   boards: [
-    { id: "141", name: "SC board", sprint: "Active sprint", active: 18, done: 9, backlog: 64, blocked: 2 },
+    { id: "141", name: "User Profiles/Identities", sprint: "SC-Sprint 8", active: 18, done: 9, backlog: 64, blocked: 2 },
     { id: "77", name: "Developer experience", sprint: "Sprint 18", active: 11, done: 4, backlog: 31, blocked: 1 },
     { id: "13", name: "Ops reliability", sprint: "Sprint 09", active: 7, done: 6, backlog: 18, blocked: 0 },
   ],
@@ -55,7 +57,12 @@ function issue(key, summary, status, priority, em, assignee, dueInDays, ageDays,
 
 function loadSettings() {
   const saved = localStorage.getItem(`${CACHE_PREFIX}settings`);
-  return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
+  if (!saved) return defaultSettings;
+  const parsed = JSON.parse(saved);
+  if (parsed.settingsVersion !== CACHE_VERSION) {
+    return { ...defaultSettings, apiBaseUrl: parsed.apiBaseUrl || defaultSettings.apiBaseUrl };
+  }
+  return { ...defaultSettings, ...parsed };
 }
 
 function saveSettings(settings) {
@@ -64,11 +71,13 @@ function saveSettings(settings) {
 
 function loadCache(section) {
   const saved = localStorage.getItem(`${CACHE_PREFIX}cache:${section}`);
-  return saved ? JSON.parse(saved) : null;
+  if (!saved) return null;
+  const parsed = JSON.parse(saved);
+  return parsed.version === CACHE_VERSION ? parsed : null;
 }
 
 function saveCache(section, payload, source = "mock") {
-  const item = { section, payload, source, refreshedAt: new Date().toISOString() };
+  const item = { version: CACHE_VERSION, section, payload, source, refreshedAt: new Date().toISOString() };
   localStorage.setItem(`${CACHE_PREFIX}cache:${section}`, JSON.stringify(item));
   return item;
 }
@@ -76,7 +85,7 @@ function saveCache(section, payload, source = "mock") {
 async function refreshSection(section) {
   setGlobalCacheState("refreshing");
   const settings = loadSettings();
-  const apiBaseUrl = settings.apiBaseUrl.trim();
+  const apiBaseUrl = settings.apiBaseUrl.trim() || (window.location.port === "4174" ? window.location.origin : "");
 
   if (apiBaseUrl) {
     const response = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/refresh/${section}`, {

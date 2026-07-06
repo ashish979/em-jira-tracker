@@ -19,6 +19,15 @@ npm run serve
 
 Open `http://localhost:4173`.
 
+This runs in mock mode. To use your local `.env` and call Jira with the Refresh
+buttons:
+
+```bash
+npm run dev:jira
+```
+
+Open `http://localhost:4174`.
+
 ## Current State
 
 The UI runs with representative mock Jira data. The backend modules in
@@ -36,7 +45,7 @@ I will need these when we connect real refreshes:
 - Team member emails or Atlassian account IDs
 - Board IDs and saved filter IDs you care about
 
-Your first configured board is `board:141 SC board`.
+Your first configured board is `board:141 User Profiles/Identities`.
 
 For token and EM field discovery steps, see `docs/jira-setup.md`.
 

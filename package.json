@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "serve": "python3 -m http.server 4173 --directory web",
-    "check": "node --check web/app.js && node --check serverless/jiraClient.mjs && node --check serverless/handlers/refresh.mjs && node --check serverless/storage/localStore.mjs && node --check scripts/discoverFields.mjs",
-    "discover:fields": "node scripts/discoverFields.mjs"
+    "dev:jira": "node scripts/devServer.mjs",
+    "check": "node --check web/app.js && node --check serverless/jiraClient.mjs && node --check serverless/handlers/refresh.mjs && node --check serverless/storage/localStore.mjs && node --check scripts/discoverFields.mjs && node --check scripts/jiraSmoke.mjs && node --check scripts/devServer.mjs",
+    "discover:fields": "node scripts/discoverFields.mjs",
+    "smoke:jira": "node scripts/jiraSmoke.mjs"
   }
 }
