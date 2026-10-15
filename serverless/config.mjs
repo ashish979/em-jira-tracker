@@ -10,6 +10,7 @@ export function loadRuntimeConfig(env = process.env) {
       email: values.JIRA_EMAIL,
       apiToken: values.JIRA_API_TOKEN,
       emField: values.JIRA_EM_FIELD,
+      supportFilterId: values.JIRA_SUPPORT_FILTER_ID,
     },
     cacheBackend: values.CACHE_BACKEND || "local",
     localCacheDir: values.LOCAL_CACHE_DIR || ".cache",

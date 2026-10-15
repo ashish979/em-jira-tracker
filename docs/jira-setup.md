@@ -22,10 +22,11 @@ cp .env.example .env
 Then edit `.env`:
 
 ```bash
-JIRA_SITE_URL=https://josysglobal.atlassian.net
-JIRA_EMAIL=ashish.agrawal@josys.com
+JIRA_SITE_URL=https://your-company.atlassian.net
+JIRA_EMAIL=you@example.com
 JIRA_API_TOKEN=your-token-here
-JIRA_EM_FIELD=customfield_10067
+JIRA_EM_FIELD=customfield_10000
+JIRA_SUPPORT_FILTER_ID=10001
 ```
 
 ## Find The EM Custom Field
@@ -37,10 +38,9 @@ npm run discover:fields
 ```
 
 Look for a row named `EM`, `Engineering Manager`, or your company's exact field
-label. For Josys, discovery found `Engineering Manager` as
-`customfield_10067`.
+label. Copy its id (for example `customfield_10000`) into `JIRA_EM_FIELD`.
 
-If the list is too broad, we can also inspect one known issue from board 141 and
+If the list is too broad, we can also inspect one known issue from your board and
 match the rendered Jira field label to the REST field id.
 
 ## Run With Live Jira Refresh

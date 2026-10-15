@@ -1,46 +1,44 @@
 const CACHE_PREFIX = "jira-command-center:";
-const CACHE_VERSION = "2026-07-06-team-sprint-consistency-v1";
+const CACHE_VERSION = "2026-10-generic-v1";
 const sections = ["team", "sprint", "overview", "attention", "support", "trackers"];
 const pageSize = 12;
 const paginationState = {};
 
 const defaultSettings = {
   settingsVersion: CACHE_VERSION,
-  jiraSiteUrl: "https://josysglobal.atlassian.net",
-  jiraEmail: "ashish.agrawal@josys.com",
-  emField: "customfield_10067",
+  jiraSiteUrl: "https://your-company.atlassian.net",
+  jiraEmail: "morgan.lee@example.com",
+  emField: "customfield_10000",
+  supportFilterId: "10001",
   apiBaseUrl: "",
   teamMembers: [
-    "amarnath.chowdary@josys.com",
-    "ashish.agrawal@josys.com",
-    "dipayan.sanyal@josys.com",
-    "golakiya.n@josys.com",
-    "kali.kumar@josys.com",
-    "karthik.devaraj@josys.com",
-    "kiran.babu@josys.com",
-    "noushadali.ms@josys.com",
-    "prashant.t@josys.com",
-    "saksham.gupta@josys.com",
-    "sanket.jagdishbhai@josys.com",
-    "shaaz.jiwani@josys.com",
-    "shaik.shahul@josys.com",
-    "swathi.kolamala@josys.com",
-    "vikas.sahu@josys.com",
+    "morgan.lee@example.com",
+    "aisha.khan@example.com",
+    "dev.patel@example.com",
+    "meera.iyer@example.com",
+    "noah.fischer@example.com",
+    "sofia.rossi@example.com",
+    "liam.oconnor@example.com",
+    "yuki.tanaka@example.com",
+    "carlos.mendes@example.com",
+    "hana.novak@example.com",
+    "omar.haddad@example.com",
+    "elena.petrova@example.com",
   ].join("\n"),
-  trackedItems: ["board:141 User Profiles/Identities", "filter:18377 Customer support attention"].join("\n"),
+  trackedItems: ["board:101 Platform Core", "filter:10001 Customer support attention"].join("\n"),
 };
 
 const seed = {
   issues: [
-    issue("PLAT-2194", "Unblock profile sync rollout", "In Progress", "High", "Ashish", "Aisha", -1, 5, ["blocked", "customer"]),
-    issue("PLAT-2208", "Billing event replay audit", "Code Review", "Medium", "Ashish", "Dev", 3, 2, ["sprint"]),
-    issue("DX-881", "Reduce CI queue time for monorepo", "In Progress", "High", "Ashish", "Meera", 7, 11, ["stale"]),
-    issue("DX-904", "Fix flaky deployment smoke test", "To Do", "Low", "Ashish", "Aisha", 14, 1, ["maintenance"]),
-    issue("SEC-442", "Access review exceptions", "Waiting", "High", "Ashish", "Dev", -3, 9, ["risk"]),
-    issue("PLAT-2220", "Sprint planning capacity update", "Done", "Medium", "Ashish", "Ashish", 2, 1, ["planning"]),
+    issue("PLAT-2194", "Unblock profile sync rollout", "In Progress", "High", "Morgan", "Aisha", -1, 5, ["blocked", "customer"]),
+    issue("PLAT-2208", "Billing event replay audit", "Code Review", "Medium", "Morgan", "Dev", 3, 2, ["sprint"]),
+    issue("DX-881", "Reduce CI queue time for monorepo", "In Progress", "High", "Morgan", "Meera", 7, 11, ["stale"]),
+    issue("DX-904", "Fix flaky deployment smoke test", "To Do", "Low", "Morgan", "Aisha", 14, 1, ["maintenance"]),
+    issue("SEC-442", "Access review exceptions", "Waiting", "High", "Morgan", "Dev", -3, 9, ["risk"]),
+    issue("PLAT-2220", "Sprint planning capacity update", "Done", "Medium", "Morgan", "Morgan", 2, 1, ["planning"]),
   ],
   boards: [
-    { id: "141", name: "User Profiles/Identities", sprint: "SC-Sprint 8", active: 18, done: 0, backlog: 64, blocked: 2 },
+    { id: "101", name: "Platform Core", sprint: "PC-Sprint 8", active: 18, done: 0, backlog: 64, blocked: 2 },
     { id: "77", name: "Developer experience", sprint: "Sprint 18", active: 11, done: 0, backlog: 31, blocked: 1 },
     { id: "13", name: "Ops reliability", sprint: "Sprint 09", active: 7, done: 0, backlog: 18, blocked: 0 },
   ],
@@ -54,7 +52,7 @@ const seed = {
 function issue(key, summary, status, priority, em, assignee, dueInDays, ageDays, labels) {
   const due = new Date();
   due.setDate(due.getDate() + dueInDays);
-  return { key, summary, status, priority, em, assignee, due: due.toISOString(), ageDays, labels, url: `https://josysglobal.atlassian.net/browse/${key}` };
+  return { key, summary, status, priority, em, assignee, due: due.toISOString(), ageDays, labels, url: `https://your-company.atlassian.net/browse/${key}` };
 }
 
 function loadSettings() {
@@ -110,8 +108,8 @@ async function refreshSection(section) {
 }
 
 function publicSettings(settings) {
-  const { jiraSiteUrl, jiraEmail, emField, teamMembers, trackedItems } = settings;
-  return { jiraSiteUrl, jiraEmail, emField, teamMembers, trackedItems };
+  const { jiraSiteUrl, jiraEmail, emField, supportFilterId, teamMembers, trackedItems } = settings;
+  return { jiraSiteUrl, jiraEmail, emField, supportFilterId, teamMembers, trackedItems };
 }
 
 function buildMockPayload(section, settings) {
@@ -127,8 +125,8 @@ function buildMockPayload(section, settings) {
 }
 
 function buildOverview() {
-  const myIssues = seed.issues.filter(isNotDone).filter((item) => item.assignee === "Ashish" || item.assignee === "Aisha");
-  const emIssues = seed.issues.filter(isNotDone).filter((item) => item.em === "Ashish");
+  const myIssues = seed.issues.filter(isNotDone).filter((item) => item.assignee === "Morgan" || item.assignee === "Aisha");
+  const emIssues = seed.issues.filter(isNotDone).filter((item) => item.em === "Morgan");
   return {
     metrics: [
       ["Assigned", myIssues.length, "+2 since cache"],
@@ -158,7 +156,7 @@ function buildAttention() {
 }
 
 function buildTeam(members) {
-  const names = members.length ? members : ["aisha@example.com", "dev@example.com", "meera@example.com"];
+  const names = members.length ? members : ["aisha.khan@example.com", "dev.patel@example.com", "meera.iyer@example.com"];
   return names.map((member, index) => {
     const active = 3 + index * 2;
     const inProgress = Math.max(1, active - 2);
@@ -174,14 +172,14 @@ function buildTeam(members) {
       recentTickets: tickets,
       currentSprint: {
         tickets: Math.max(0, 3 - (index % 4)),
-        boards: [{ id: "141", name: "User Profiles/Identities", sprint: { id: 11306, name: "SC-Sprint 8" }, count: Math.max(0, 3 - (index % 4)) }],
+        boards: [{ id: "101", name: "Platform Core", sprint: { id: 11306, name: "PC-Sprint 8" }, count: Math.max(0, 3 - (index % 4)) }],
         sprintIds: [11306],
         ticketSample: tickets.slice(0, 3),
       },
       boards: [
         {
-          id: "141",
-          name: "User Profiles/Identities",
+          id: "101",
+          name: "Platform Core",
           active: Math.max(1, inProgress - 1),
           workedOn: tickets.length,
           tickets,
@@ -205,8 +203,8 @@ function buildBoards(tracked) {
 function buildSprint(tracked, members) {
   return buildBoards(tracked).map((board) => {
     const mockEpics = [
-      { key: "SC-1000", summary: "Identity lifecycle controls", type: "Epic", status: "In Progress", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/SC-1000` },
-      { key: "SC-1021", summary: "Profile reliability", type: "Epic", status: "To Do", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/SC-1021` },
+      { key: "PC-1000", summary: "Account lifecycle controls", type: "Epic", status: "In Progress", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/PC-1000` },
+      { key: "PC-1021", summary: "Service reliability", type: "Epic", status: "To Do", url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/browse/PC-1021` },
     ];
     const tickets = seed.issues.filter(isNotDone).map((item, index) => ({
       ...item,
@@ -217,11 +215,11 @@ function buildSprint(tracked, members) {
       ...board,
       sprint: {
         id: 11306,
-        name: "SC-Sprint 8",
+        name: "PC-Sprint 8",
         state: "active",
         startDate: new Date(Date.now() - 7 * 86400000).toISOString(),
         endDate: new Date(Date.now() + 5 * 86400000).toISOString(),
-        goal: "Keep identity/profile work moving without hidden blockers",
+        goal: "Keep platform work moving without hidden blockers",
         daysRemaining: 5,
         isPastEndDate: false,
       },
@@ -252,8 +250,8 @@ function buildSprint(tracked, members) {
 function buildSupport() {
   const tickets = seed.issues.filter(isNotDone).map(addMockReasons);
   return {
-    filterId: "18377",
-    url: "https://josysglobal.atlassian.net/issues/?filter=18377",
+    filterId: loadSettings().supportFilterId,
+    url: `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?filter=${loadSettings().supportFilterId}`,
     totals: {
       tickets: tickets.length,
       critical: tickets.filter((ticket) => ticket.severity === "critical").length,
@@ -491,11 +489,11 @@ function renderBoards(cache) {
 function renderSupport(cache) {
   setMeta("support", cache);
   const payload = { ...cache.payload, tickets: (cache.payload.tickets || []).filter(isNotDone) };
-  const filterUrl = payload.url || supportFilterUrl(payload.filterId || "18377");
+  const filterUrl = payload.url || supportFilterUrl(payload.filterId || loadSettings().supportFilterId);
   document.getElementById("support-view").innerHTML = `
     <div class="support-header">
       <div>
-        <span class="eyebrow">filter ${escapeHtml(payload.filterId || "18377")}</span>
+        <span class="eyebrow">filter ${escapeHtml(payload.filterId || loadSettings().supportFilterId)}</span>
         <h4>Customer support attention queue</h4>
       </div>
       <a class="command-link" href="${escapeAttribute(filterUrl)}" target="_blank" rel="noopener noreferrer">Open in Jira</a>
@@ -884,12 +882,12 @@ function teamCurrentSprintSearchUrl(member) {
   return jiraSearchUrl(`${assigneeClause} ${sprintClause} AND statusCategory != "Done" ORDER BY updated DESC`.trim());
 }
 
-function supportFilterUrl(filterId = "18377") {
+function supportFilterUrl(filterId = loadSettings().supportFilterId) {
   return `${loadSettings().jiraSiteUrl.replace(/\/$/, "")}/issues/?filter=${encodeURIComponent(filterId)}`;
 }
 
 function supportSearchUrl(payload, suffix = "ORDER BY priority DESC, updated ASC") {
-  const filterId = payload.filterId || "18377";
+  const filterId = payload.filterId || loadSettings().supportFilterId;
   return jiraSearchUrl(`filter = ${filterId} AND statusCategory != "Done" ${suffix}`.trim());
 }
 

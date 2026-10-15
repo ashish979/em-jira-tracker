@@ -3,7 +3,7 @@ import { createJiraClient } from "../serverless/jiraClient.mjs";
 
 const config = loadRuntimeConfig();
 const jira = createJiraClient(config.jira);
-const boardId = "141";
+const boardId = process.env.JIRA_BOARD_ID || "101";
 
 const [board, sprints, assigned, emOwned] = await Promise.all([
   jira.getBoard(boardId),
@@ -15,7 +15,7 @@ const [board, sprints, assigned, emOwned] = await Promise.all([
     limit: 5,
   }),
   jira.searchIssues({
-    jql: "cf[10067] = currentUser() AND resolution = EMPTY ORDER BY updated DESC",
+    jql: `cf[${config.jira.emField.replace("customfield_", "")}] = currentUser() AND resolution = EMPTY ORDER BY updated DESC`,
     fields: ["summary", "status", "assignee", config.jira.emField],
     maxResults: 5,
     limit: 5,

@@ -99,7 +99,7 @@ async function refreshPayload(section, body, config) {
   }
 
   if (section === "support") {
-    return loadSupportAttention(jira, fields, emField, siteUrl, "18377");
+    return loadSupportAttention(jira, fields, emField, siteUrl, body?.settings?.supportFilterId || config.jira.supportFilterId);
   }
 
   if (section === "trackers") {

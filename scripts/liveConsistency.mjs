@@ -1,30 +1,16 @@
 import { loadRuntimeConfig } from "../serverless/config.mjs";
 import { createJiraClient } from "../serverless/jiraClient.mjs";
 
+const runtime = loadRuntimeConfig();
 const settings = {
-  trackedItems: "board:141 User Profiles/Identities\nfilter:18377 Customer support attention",
-  teamMembers: [
-    "amarnath.chowdary@josys.com",
-    "ashish.agrawal@josys.com",
-    "dipayan.sanyal@josys.com",
-    "golakiya.n@josys.com",
-    "kali.kumar@josys.com",
-    "karthik.devaraj@josys.com",
-    "kiran.babu@josys.com",
-    "noushadali.ms@josys.com",
-    "prashant.t@josys.com",
-    "saksham.gupta@josys.com",
-    "sanket.jagdishbhai@josys.com",
-    "shaaz.jiwani@josys.com",
-    "shaik.shahul@josys.com",
-    "swathi.kolamala@josys.com",
-    "vikas.sahu@josys.com",
-  ].join("\n"),
-  emField: "customfield_10067",
+  trackedItems: process.env.JIRA_TRACKED_ITEMS || "board:101 Platform Core\nfilter:10001 Customer support attention",
+  teamMembers: process.env.JIRA_TEAM_MEMBERS || "morgan.lee@example.com\naisha.khan@example.com\ndev.patel@example.com",
+  emField: runtime.jira.emField,
+  supportFilterId: runtime.jira.supportFilterId,
 };
 
 const sections = ["overview", "attention", "team", "sprint", "support", "trackers"];
-const jira = createJiraClient(loadRuntimeConfig().jira);
+const jira = createJiraClient(runtime.jira);
 
 const payloads = Object.fromEntries(await Promise.all(sections.map(async (section) => [section, await refresh(section)])));
 const doneShown = collectTickets(payloads).filter(isDone).map((ticket) => ticket.key);
